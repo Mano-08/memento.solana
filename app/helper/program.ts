@@ -42,7 +42,7 @@ export async function loadKeypairFromFile(): Promise<KeyPairSigner<string>> {
 }
 
 export async function loadDefaultKeypair(): Promise<KeyPairSigner<string>> {
-  return await loadKeypairFromFile("/Users/wmano/.config/solana/id.json");
+  return await loadKeypairFromFile();
 }
 
 export async function assertProgramsDeployed(
