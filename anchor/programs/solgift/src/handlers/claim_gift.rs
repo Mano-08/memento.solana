@@ -22,11 +22,11 @@ pub struct ClaimGift<'info> {
     #[account(
         mut, 
         close = asset_recipient,
-        seeds = [&SEED_GIFT_ACCOUNT, &gift.sender.key().as_ref(), &gift.id.to_le_bytes()],
+        seeds = [&SEED_GIFT_ACCOUNT, &gift.sender.key().as_ref(), &gift.index.to_le_bytes()],
         bump = gift.bump,
         has_one = nft_mint @ ClaimError::IncorrectNFTMint,
         constraint = !gift.claimed @ ClaimError::ClaimedAlready,
-        constraint = gift.receiver == authorized_claimer.key() @ ClaimError::UnauthorizedClaimer
+        constraint = gift.authorized_claimer == authorized_claimer.key() @ ClaimError::UnauthorizedClaimer
     )]
     pub gift: Account<'info, Gift>,
     pub nft_mint: InterfaceAccount<'info, Mint>,
@@ -56,7 +56,7 @@ pub fn claim_gift(ctx: Context<ClaimGift>, answer_hash: [u8; 32]) -> Result<()> 
     
     require!(claimed_answer_hash == gift.answer_hash, ClaimError::InvalidAnswer);
     
-    let id_bytes = gift.id.to_le_bytes();
+    let id_bytes = gift.index.to_le_bytes();
     let bump_bytes = [gift.bump];
     let signer_seeds: &[&[&[u8]]] = &[&[&SEED_GIFT_ACCOUNT, gift.sender.as_ref(), id_bytes.as_ref(), bump_bytes.as_ref()]];
     

@@ -116,3 +116,27 @@ This uses [Codama](https://github.com/codama-idl/codama) to generate a type-safe
 - [Deploying Programs](https://solana.com/docs/programs/deploying) - deployment guide
 - [framework-kit](https://github.com/solana-foundation/framework-kit) - the React hooks used here
 - [Codama](https://github.com/codama-idl/codama) - client generation from IDL
+
+solana-test-validator --bpf-program metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s anchor/mpl_token_metadata.so --reset
+
+TODO;
+
+[DONE] 1. send claimed recipeitne + gift pda to DB
+
+3. connect to supabase with, privy, react wallet everything weaved together.
+
+4. update landing page UI for demo
+
+5. hCaptha integration
+
+6. refactor + push to vercel today
+
+7. add RLS in supabase
+
+8. make navbar taller
+
+9. fix Wallet connector UI issue
+
+[DONE] 4. ceaate delivery date + creted on date in DB
+
+[DONE] 5. received gift should populate with info

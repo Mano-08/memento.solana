@@ -1,160 +1,133 @@
 "use client";
-import { useWalletConnection } from "@solana/react-hooks";
-import { VaultCard } from "./components/vault-card";
+
+import "@radix-ui/themes/styles.css";
+import Link from "next/link";
+
+import { bricolage, spaceMono } from "./fonts/fonts";
 
 export default function Home() {
-  const { connectors, connect, disconnect, wallet, status } =
-    useWalletConnection();
+  return (
+    <main className="">
+      <div className="h-screen bg-solana-purple flex flex-col justify-center items-center">
+        <div className="h-[50vh] items-center justify-center flex flex-col">
+          <h1
+            className={`${bricolage.className} font-extrabold text-[20vw] text-white`}
+          >
+            <StyledLetter letter="G" index={0} />
+            <StyledLetter letter="i" index={1} />
+            <StyledLetter letter="f" index={2} />
+            <StyledLetter letter="t" index={3} />
+            <StyledLetter letter="s" index={4} />
+            <StyledLetter letter="o" index={5} />
+            <StyledLetter letter="L" index={6} />
+          </h1>
+        </div>
+        <h2 className={`my-3 ${spaceMono.className}`}>Gift NFTs in seconds</h2>
+        <Link
+          href="/gift"
+          className="relative z-2 font-extrabold text-2xl text-black rounded-xl py-4 px-8 bg-lime-300 border-[6px] border-black shadow-[-5px_5px_0_0_rgba(0,0,0)] cursor-pointer transition-all duration-200
+          hover:shadow-[-9px_9px_0_0_rgba(0,0,0)] active:shadow-[-5px_5px_0_0_rgba(0,0,0)] active:translate-0
+          hover:translate-x-1 hover:-translate-y-1"
+        >
+          <button className="cursor-pointer">GIFT NOW!</button>
+        </Link>
+      </div>
+    </main>
+  );
+}
 
-  const address = wallet?.account.address.toString();
+import { useEffect, useRef, useState } from "react";
+
+type StyledLetterProps = {
+  letter: string;
+  index: number;
+  scrollFactor?: number; // controls how quickly the letter is displaced
+  maxOffset?: number; // max x/y pixel offset
+  maxRotate?: number; // max rotation in deg
+};
+
+// Create a seeded pseudo-random generator for deterministic randomness per index
+function seededRandom(seed: number) {
+  let x = Math.sin(seed + 1) * 10000;
+  return x - Math.floor(x);
+}
+
+function randomizeFromIndex(index: number, min: number, max: number) {
+  const r = seededRandom(index * 13.37 + 27.1);
+  return min + r * (max - min);
+}
+
+function StyledLetter({
+  letter,
+  index,
+  // Make the effect even smoother (slower travel per scroll and more inertia)
+  scrollFactor = 0.05, // smaller = slower movement <<<< Increase scrollFactor (e.g. 0.05, 0.1) to make effect faster
+  maxOffset = 36,
+  maxRotate = 10,
+}: StyledLetterProps) {
+  const [interpolatedT, setInterpolatedT] = useState(0);
+  const targetTRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const denom = typeof window !== "undefined" ? window.innerHeight : 1000;
+      let t = denom ? window.scrollY / denom : 0;
+      t = Math.max(0, Math.min(t, 1));
+      targetTRef.current = t;
+    };
+
+    const animate = () => {
+      setInterpolatedT((t) => {
+        // Use a smaller lerp factor for smoother/slower animation
+        const lerpFactor = 0.06; // even lower for more "inertia/smoothness" <<<< Increase lerpFactor (e.g. 0.15, 0.25, up to 1) to make effect snappier/faster
+        return t + (targetTRef.current - t) * lerpFactor;
+      });
+      rafRef.current = requestAnimationFrame(animate);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    rafRef.current = requestAnimationFrame(animate);
+
+    // Initialize t in case the page already scrolled
+    handleScroll();
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  // Randomize target offsets and angle per letter
+  const targetX = randomizeFromIndex(index, -maxOffset, maxOffset);
+  const targetY = randomizeFromIndex(index + 100, -maxOffset, maxOffset);
+  const targetRotate = randomizeFromIndex(index + 200, -maxRotate, maxRotate);
+
+  // easeInOutCubic for even smoother interpolation.
+  const ease = (x: number) =>
+    x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  const et = ease(interpolatedT);
+
+  // The offsets are scaled by a smaller scrollFactor for even slower, smoother effect
+  const xOffset = targetX * et * scrollFactor * 6; // scale *6 to keep visual parity with old offset - reduces jump
+  const yOffset = targetY * et * scrollFactor * 6;
+  const rotate = targetRotate * et * scrollFactor * 6;
 
   return (
-    <div className="relative min-h-screen overflow-x-clip bg-bg1 text-foreground">
-      <main className="relative z-10 mx-auto flex min-h-screen max-w-4xl flex-col gap-10 border-x border-border-low px-6 py-16">
-        <header className="space-y-3">
-          <p className="text-sm uppercase tracking-[0.18em] text-muted">
-            Solana starter kit
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-            Ship a Solana dapp fast
-          </h1>
-          <p className="max-w-3xl text-base leading-relaxed text-muted">
-            Drop in <code className="font-mono">@solana/react-hooks</code>, wrap
-            your tree once, and you get wallet connect/disconnect plus
-            ready-to-use hooks for balances and transactions—no manual RPC
-            wiring.
-          </p>
-          <ul className="mt-4 space-y-2 text-sm text-foreground">
-            <li className="flex gap-2">
-              <span
-                className="mt-1.5 h-2 w-2 rounded-full bg-foreground/60"
-                aria-hidden
-              />
-              <div>
-                <a
-                  className="font-medium underline underline-offset-2"
-                  href="https://solana.com/docs"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Solana docs
-                </a>{" "}
-                — core concepts, RPC, programs, and client patterns.
-              </div>
-            </li>
-            <li className="flex gap-2">
-              <span
-                className="mt-1.5 h-2 w-2 rounded-full bg-foreground/60"
-                aria-hidden
-              />
-              <div>
-                <a
-                  className="font-medium underline underline-offset-2"
-                  href="https://www.anchor-lang.com/docs/introduction"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Anchor docs
-                </a>{" "}
-                — build and test programs with IDL, macros, and type-safe
-                clients.
-              </div>
-            </li>
-            <li className="flex gap-2">
-              <span
-                className="mt-1.5 h-2 w-2 rounded-full bg-foreground/60"
-                aria-hidden
-              />
-              <div>
-                <a
-                  className="font-medium underline underline-offset-2"
-                  href="https://faucet.solana.com/"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Solana faucet (devnet)
-                </a>{" "}
-                — grab free devnet SOL to try transfers and transactions.
-              </div>
-            </li>
-            <li className="flex gap-2">
-              <span
-                className="mt-1.5 h-2 w-2 rounded-full bg-foreground/60"
-                aria-hidden
-              />
-              <div>
-                <a
-                  className="font-medium underline underline-offset-2"
-                  href="https://github.com/solana-foundation/framework-kit/tree/main/packages/react-hooks"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  @solana/react-hooks README
-                </a>{" "}
-                — how this starter wires the client, connectors, and hooks.
-              </div>
-            </li>
-          </ul>
-        </header>
-
-        <section className="w-full max-w-3xl space-y-4 rounded-2xl border border-border-low bg-card p-6 shadow-[0_20px_80px_-50px_rgba(0,0,0,0.35)]">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <p className="text-lg font-semibold">Wallet connection</p>
-              <p className="text-sm text-muted">
-                Pick any discovered connector and manage connect / disconnect in
-                one spot.
-              </p>
-            </div>
-            <span className="rounded-full bg-cream px-3 py-1 text-xs font-semibold uppercase tracking-wide text-foreground/80">
-              {status === "connected" ? "Connected" : "Not connected"}
-            </span>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            {connectors.map((connector) => (
-              <button
-                key={connector.id}
-                onClick={() => connect(connector.id)}
-                disabled={status === "connecting"}
-                className="group flex items-center justify-between rounded-xl border border-border-low bg-card px-4 py-3 text-left text-sm font-medium transition hover:-translate-y-0.5 hover:shadow-sm cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <span className="flex flex-col">
-                  <span className="text-base">{connector.name}</span>
-                  <span className="text-xs text-muted">
-                    {status === "connecting"
-                      ? "Connecting…"
-                      : status === "connected" &&
-                          wallet?.connector.id === connector.id
-                        ? "Active"
-                        : "Tap to connect"}
-                  </span>
-                </span>
-                <span
-                  aria-hidden
-                  className="h-2.5 w-2.5 rounded-full bg-border-low transition group-hover:bg-primary/80"
-                />
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 border-t border-border-low pt-4 text-sm">
-            <span className="rounded-lg border border-border-low bg-cream px-3 py-2 font-mono text-xs">
-              {address ?? "No wallet connected"}
-            </span>
-            <button
-              onClick={() => disconnect()}
-              disabled={status !== "connected"}
-              className="inline-flex items-center gap-2 rounded-lg border border-border-low bg-card px-3 py-2 font-medium transition hover:-translate-y-0.5 hover:shadow-sm cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Disconnect
-            </button>
-          </div>
-        </section>
-
-        {/* Vault Program Section */}
-        <VaultCard />
-      </main>
-    </div>
+    <span
+      style={{
+        display: "inline-block",
+        transform: `translate(${xOffset.toFixed(2)}px, ${yOffset.toFixed(
+          2
+        )}px) rotate(${rotate.toFixed(2)}deg)`,
+        WebkitTextStroke: "8px black",
+        textShadow:
+          "-6px 6px 0px black, -12px 12px 16px rgba(0,0,0,0.25), -4px 4px 8px rgba(0,0,0,0.15)",
+        transition: "none",
+        willChange: "transform",
+      }}
+    >
+      {letter}
+    </span>
   );
 }

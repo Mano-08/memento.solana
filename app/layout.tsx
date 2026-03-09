@@ -1,28 +1,25 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./components/providers";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { Space_Mono } from "next/font/google";
+import "@radix-ui/themes/styles.css";
+import Navbar from "./components/navbar";
+import Footer from "./components/footer";
 
 export const metadata: Metadata = {
-  title: "Solana dApp Starter",
-  description: "A minimal Next.js starter powered by @solana/react-hooks",
+  title: "SolGift",
+  description: "Gift Solana NFT to your friends",
   icons: {
     icon: "/icon.svg",
     shortcut: "/icon.svg",
     apple: "/icon.svg",
   },
 };
+
+const spaceMono = Space_Mono({
+  subsets: ["vietnamese"],
+  weight: ["400", "700"],
+});
 
 export default function RootLayout({
   children,
@@ -31,14 +28,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <Providers>
-        <body
-          suppressHydrationWarning
-          className={`${inter.variable} ${geistMono.variable} antialiased`}
-        >
+      <body
+        suppressHydrationWarning
+        className={`${spaceMono.className} antialiased`}
+      >
+        <Providers>
+          <Navbar />
           {children}
-        </body>
-      </Providers>
+          <Footer />
+        </Providers>
+      </body>
     </html>
   );
 }

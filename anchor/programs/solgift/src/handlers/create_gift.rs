@@ -14,7 +14,7 @@ use anchor_spl::{
 pub struct GiftCreated {
     gift: Pubkey,
     sender: Pubkey,
-    receiver: Pubkey,
+    authorized_claimer: Pubkey,
     created_on: u64,
 }
 
@@ -52,10 +52,10 @@ pub struct CreateGift<'info> {
     pub token_program: Interface<'info, TokenInterface>,
 }
 
-pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 32], sol_amount: u64, delivery_date: u64, receiver: Pubkey) -> Result<()> {
+pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 32], sol_amount: u64, delivery_date: u64, authorized_claimer: Pubkey) -> Result<()> {
     require!(sol_amount >= 1_000_000, GiftError::BelowMinimumAmount);
     require!(
-        receiver != Pubkey::default(),
+        authorized_claimer != Pubkey::default(),
         GiftError::InvalidReceiver
     );
     require!(
@@ -63,7 +63,7 @@ pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 3
         GiftError::DeliveryDateMustBeInFuture
     );
     require!(
-        receiver != ctx.accounts.signer.key(),
+        authorized_claimer != ctx.accounts.signer.key(),
         GiftError::CannotGiftToSelf 
     );
     require!(
@@ -92,8 +92,8 @@ pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 3
     gift.delivery_date = delivery_date;
     gift.sol_amount = sol_amount;
     gift.sender = ctx.accounts.signer.key();
-    gift.receiver = receiver;
-    gift.id = user.count;
+    gift.authorized_claimer = authorized_claimer;
+    gift.index = user.count;
     gift.bump = ctx.bumps.gift;
     gift.claimed = false;
     user.count += 1;
@@ -112,7 +112,7 @@ pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 3
     emit!(GiftCreated {
         gift: gift.key(),
         sender: ctx.accounts.signer.key(),
-        receiver,
+        authorized_claimer,
         created_on: gift.created_on,
     });
 
