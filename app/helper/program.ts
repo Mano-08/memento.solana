@@ -3,6 +3,7 @@ import {
   createKeyPairSignerFromBytes,
   getBase64Encoder,
   KeyPairSigner,
+  Rpc,
 } from "@solana/kit";
 
 export async function uploadImageToPinata(imageFile: File) {
@@ -21,9 +22,7 @@ export async function uploadImageToPinata(imageFile: File) {
   }
 }
 
-export async function loadKeypairFromFile(
-  filePath: string
-): Promise<KeyPairSigner<string>> {
+export async function loadKeypairFromFile(): Promise<KeyPairSigner<string>> {
   // This is here so you can also load the default keypair from the file system.
 
   // const loadedKeyBytes = Uint8Array.from(
@@ -61,8 +60,8 @@ export async function assertProgramsDeployed(
       }
 
       // Programs have executable = true
-      const info = account.value;
-      const bytes = getBase64Encoder().encode(info.data[0]);
+      // const info = account.value;
+      // const bytes = getBase64Encoder().encode(info.data[0]);
       // executable flag is in the account metadata, not the data —
       // just checking existence is enough for our purposes
       console.log(`✅ Program deployed: ${address}`);

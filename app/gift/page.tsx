@@ -192,8 +192,8 @@ export default function CreateGiftForm() {
       // const nftDescription = createGiftData.get("nftDescription")! as string;
       const nftDescription = "A present!";
       const question = createGiftData.securityQuestion;
-      let imageCid: string =
-        "bafkreidgjaaey4q3ergcx5cz5wv65jlc5yzcmx3ayz5ewe5afdkazjmyga"; // await uploadImageToPinata(imageFile);
+      // let imageCid: string =
+      //   "bafkreidgjaaey4q3ergcx5cz5wv65jlc5yzcmx3ayz5ewe5afdkazjmyga"; // await uploadImageToPinata(imageFile);
       // let metadataCid: string = await uploadMetadataToPinata({
       //   nftName,
       //   nftDescription,
