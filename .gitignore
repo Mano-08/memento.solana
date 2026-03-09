@@ -44,5 +44,6 @@ next-env.d.ts
 /anchor/.anchor/
 /anchor/target/
 /anchor/test-ledger
+/test-ledger
 
 /test-ledger
