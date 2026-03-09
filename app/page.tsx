@@ -48,7 +48,7 @@ type StyledLetterProps = {
 
 // Create a seeded pseudo-random generator for deterministic randomness per index
 function seededRandom(seed: number) {
-  let x = Math.sin(seed + 1) * 10000;
+  const x = Math.sin(seed + 1) * 10000;
   return x - Math.floor(x);
 }
 

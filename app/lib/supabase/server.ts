@@ -19,9 +19,15 @@ export async function createClient() {
         },
         setAll(cookiesToSet) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
+            // 'cookieStore' here is a ReadonlyRequestCookies, which does not have the 'set' method.
+            // To set cookies in a Server Action (or handler), you should use the cookies() function again directly
+            // because cookies() in Next.js returns a mutable ResponseCookies in action/request handler/server func,
+            // otherwise it is a ReadonlyRequestCookies.
+            //
+            // Here's how you can set each cookie:
+            cookiesToSet.forEach(async ({ name, value, options }) => {
+              (await cookies()).set(name, value, options);
+            });
           } catch {
             // The `setAll` method was called from a Server Component.
             // This can be ignored if you have proxy refreshing

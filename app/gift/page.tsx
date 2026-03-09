@@ -45,7 +45,7 @@ import {
   getTransferSolInstruction,
 } from "@solana-program/system";
 import { RECURSIVE_HASH_DEPTH } from "@/app/helper/constants";
-import idl from "@/anchor/target/idl/solgift.json";
+import idl from "../../anchor/target/idl/solgift.json";
 import {
   getCreateGiftInstruction,
   getInitializeUserInstruction,
