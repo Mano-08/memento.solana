@@ -59,7 +59,6 @@ export function WalletModal({
     connectWallet,
     disconnectWallet,
   } = useConnector();
-
   const status = walletStatus.status;
 
   const [connectingConnectorId, setConnectingConnectorId] =
@@ -121,6 +120,7 @@ export function WalletModal({
         // Ensure stale URIs don't flash
         onClearWalletConnectUri?.();
       }
+      console.log("connector.id", connector.id, connector);
       await connectWallet(connector.id);
       localStorage.setItem("recentlyConnectedConnectorId", connector.id);
       setRecentlyConnectedConnectorId(connector.id);
@@ -153,7 +153,6 @@ export function WalletModal({
   const handleBackFromWalletConnect = () => {
     cancelConnection();
   };
-  console.log("connectores", connectors);
 
   const readyConnectors = connectors.filter((c) => c.ready);
   const notReadyConnectors = connectors.filter((c) => !c.ready);

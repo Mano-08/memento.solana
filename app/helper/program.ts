@@ -18,7 +18,7 @@ export async function uploadImageToPinata(imageFile: File) {
     return data.cid;
   } catch (error) {
     console.error("ERR: while uploading image to pinata", error);
-    throw Error("ERR: failed to upload image to pinata");
+    throw new Error("ERR: failed to upload image to pinata");
   }
 }
 
@@ -93,6 +93,6 @@ export async function uploadMetadataToPinata({
     return data.cid;
   } catch (error) {
     console.log("ERR: failed to upload metadata to pinata", error);
-    throw Error("ERR: failed to upload metadata to pinata");
+    throw new Error("ERR: failed to upload metadata to pinata");
   }
 }

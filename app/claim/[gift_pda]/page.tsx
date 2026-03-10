@@ -87,7 +87,7 @@ export default function Page() {
         });
         if (!response.ok) {
           const errorData = await response.json();
-          throw Error(errorData);
+          throw new Error(errorData);
         }
         const dbData = await response.json();
         setCipher(dbData.data.security_question || "");
@@ -134,7 +134,7 @@ export default function Page() {
       await createKeyPairSignerFromPrivateKeyBytes(new Uint8Array(seed));
 
     if (authorizedClaimerKeypair.address !== gift.data.authorizedClaimer) {
-      throw Error("UNAUTHORIZEDC LCAIMER");
+      throw new Error("UNAUTHORIZEDC LCAIMER");
       return;
     }
     // setAuthorizedClaimer();

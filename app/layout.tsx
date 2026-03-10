@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Providers } from "./components/providers";
+import { Providers } from "@/app/providers";
 import { Space_Mono } from "next/font/google";
 import "@radix-ui/themes/styles.css";
-import Navbar from "./components/navbar";
+import AppNav from "./components/appnav";
 import Footer from "./components/footer";
 
 export const metadata: Metadata = {
@@ -28,12 +28,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        suppressHydrationWarning
-        className={`${spaceMono.className} antialiased`}
-      >
+      <body className={`${spaceMono.className} antialiased`}>
         <Providers>
-          <Navbar />
+          <AppNav />
           {children}
           <Footer />
         </Providers>
