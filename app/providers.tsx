@@ -7,6 +7,8 @@ import {
   getDefaultConfig,
   getDefaultMobileConfig,
 } from "@solana/connector/react";
+import { useCreateWallet } from "@privy-io/react-auth/solana";
+
 import { createRemoteSignerWallet } from "@solana/connector/remote";
 import { SolanaProvider } from "@solana/react-hooks";
 
@@ -16,6 +18,8 @@ const getOrigin = () => {
   }
   return "http://localhost:3000";
 };
+
+import { PrivyProvider } from "@privy-io/react-auth";
 
 // Enable remote signer via environment variable (set NEXT_PUBLIC_ENABLE_REMOTE_SIGNER=true)
 // For testing, default to true if not explicitly set to 'false'
@@ -51,20 +55,8 @@ export function Providers({ children }: { children: ReactNode }) {
     ];
 
     // Create remote signer wallet if enabled
-    // This wallet delegates signing to the /api/connector-signer endpoint
+    // This wallet delegates signing to the /api/privy-signer endpoint
     console.log("origin", origin);
-    const additionalWallets = ENABLE_REMOTE_SIGNER
-      ? [
-          createRemoteSignerWallet({
-            endpoint: `${origin}/api/v1/privy-signer`,
-            name: "Privy",
-            // Optional: provide auth headers for the signing API
-            // getAuthHeaders: () => ({
-            //     'Authorization': `Bearer ${getSessionToken()}`
-            // }),
-          }),
-        ]
-      : undefined;
 
     return getDefaultConfig({
       appName: "ConnectorKit Example",
@@ -72,7 +64,7 @@ export function Providers({ children }: { children: ReactNode }) {
       autoConnect: true,
       enableMobile: true,
       clusters,
-      additionalWallets,
+      additionalWallets: undefined,
       // WalletConnect: just set to true!
       // Project ID is auto-read from NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
       // Metadata is auto-generated from appName/appUrl
@@ -126,10 +118,10 @@ export function Providers({ children }: { children: ReactNode }) {
   // }, []);
 
   return (
-    // <SolanaProvider>
-    <AppProvider connectorConfig={connectorConfig} mobile={mobile}>
-      {children}
-    </AppProvider>
-    // </SolanaProvider>
+    <PrivyProvider appId={`${process.env.NEXT_PUBLIC_PRIVY_APP_ID}`}>
+      <AppProvider connectorConfig={connectorConfig} mobile={mobile}>
+        {children}
+      </AppProvider>
+    </PrivyProvider>
   );
 }

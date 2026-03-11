@@ -17,11 +17,9 @@ pub struct GiftClaimed {
 pub struct ClaimGift<'info> {
     #[account(mut)]
     pub authorized_claimer: Signer<'info>,
-    #[account(mut)]
-    pub asset_recipient: Signer<'info>,
     #[account(
         mut, 
-        close = asset_recipient,
+        close = authorized_claimer,
         seeds = [&SEED_GIFT_ACCOUNT, &gift.sender.key().as_ref(), &gift.index.to_le_bytes()],
         bump = gift.bump,
         has_one = nft_mint @ ClaimError::IncorrectNFTMint,
@@ -41,9 +39,9 @@ pub struct ClaimGift<'info> {
         init_if_needed,
         payer = authorized_claimer,
         associated_token::mint = nft_mint,
-        associated_token::authority = asset_recipient,
+        associated_token::authority = authorized_claimer,
     )]
-    pub asset_recipient_nft_ata: InterfaceAccount<'info, TokenAccount>,
+    pub authorized_claimer_nft_ata: InterfaceAccount<'info, TokenAccount>,
     
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -63,7 +61,7 @@ pub fn claim_gift(ctx: Context<ClaimGift>, answer_hash: [u8; 32]) -> Result<()> 
     let cpi_accounts = TransferChecked {
         mint: ctx.accounts.nft_mint.to_account_info(),
         from: ctx.accounts.gift_nft_ata.to_account_info(),
-        to: ctx.accounts.asset_recipient_nft_ata.to_account_info(),
+        to: ctx.accounts.authorized_claimer_nft_ata.to_account_info(),
         authority: gift.to_account_info(),
     };
     let cpi_program = ctx.accounts.token_program.to_account_info();

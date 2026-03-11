@@ -6,6 +6,8 @@ import {
   type WalletConnectorMetadata,
 } from "@solana/connector/react";
 import { HiddenWalletIcons } from "@/app/components/hidden-wallet-icons";
+import { useConnectOrCreateWallet, usePrivy } from "@privy-io/react-auth";
+
 import {
   Dialog,
   DialogContent,
@@ -35,6 +37,8 @@ import {
 import { useState, useEffect } from "react";
 import { Spinner } from "@/app/components/ui/spinner";
 import { CustomQRCode } from "@/app/components/ui/custom-qr-code";
+import { useWallets } from "@privy-io/react-auth/solana";
+import { PRIVY_WALLET_CONNECTOR_ID } from "../helper/constants";
 
 interface WalletModalProps {
   open: boolean;
@@ -61,12 +65,16 @@ export function WalletModal({
   } = useConnector();
   const status = walletStatus.status;
 
+  const [wallet, setWallet] = useState<null | any>(null);
+
   const [connectingConnectorId, setConnectingConnectorId] =
     useState<WalletConnectorId | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [recentlyConnectedConnectorId, setRecentlyConnectedConnectorId] =
     useState<WalletConnectorId | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const { connectOrCreateWallet } = useConnectOrCreateWallet();
 
   useEffect(() => {
     setIsClient(true);
@@ -103,6 +111,20 @@ export function WalletModal({
     disconnectWallet().catch(() => {});
   }
 
+  const { user } = usePrivy();
+
+  console.log(user, "PRIVY USER usePrivy()");
+
+  // Filter for wallet accounts from all linked accounts
+  const linkedWallets = user?.linkedAccounts.filter(
+    (account) => account.type === "wallet" || account.type === "smart_wallet"
+  );
+
+  // Access wallet addresses
+  linkedWallets?.forEach((wallet) => {
+    console.log(wallet.address);
+  });
+
   function handleOpenChange(nextOpen: boolean) {
     if (
       !nextOpen &&
@@ -121,10 +143,15 @@ export function WalletModal({
         onClearWalletConnectUri?.();
       }
       console.log("connector.id", connector.id, connector);
-      await connectWallet(connector.id);
+      if (connector.id === PRIVY_WALLET_CONNECTOR_ID) {
+        connectOrCreateWallet();
+      } else {
+        await connectWallet(connector.id);
+      }
       localStorage.setItem("recentlyConnectedConnectorId", connector.id);
       setRecentlyConnectedConnectorId(connector.id);
       // Don't close modal for WalletConnect - wait for connection
+      console.log(connector, "HERE JRE");
       if (connector.name !== "WalletConnect") {
         onOpenChange(false);
       }
@@ -165,7 +192,19 @@ export function WalletModal({
     return 0;
   });
 
-  const primaryWallets = sortedReadyConnectors.slice(0, 3);
+  const privyConnector = {
+    id: "privy-embedded" as WalletConnectorId,
+    name: "Email Wallet",
+    icon: "/icon.svg",
+    ready: true,
+    features: [],
+    chains: ["devnet:solana"],
+  };
+
+  // Insert Privy wallet as the first wallet in the sortedReadyConnectors list
+  sortedReadyConnectors.unshift(privyConnector as WalletConnectorMetadata);
+
+  let primaryWallets = sortedReadyConnectors.slice(0, 3);
   const otherWallets = sortedReadyConnectors.slice(3);
 
   const getInstallUrl = (walletName: string) => {
