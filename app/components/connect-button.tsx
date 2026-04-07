@@ -12,13 +12,20 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@/app/components/ui/avatar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { WalletModal } from "./wallet-modal";
 import { WalletDropdownContent } from "./wallet-dropdown-content";
 import { Wallet, ChevronDown } from "lucide-react";
 import { Spinner } from "@/app/components/ui/spinner";
-import { cn } from "@/app/lib/utils";
+import { cn, truncate } from "@/app/lib/utils";
+import { usePrivy, useSignMessage } from "@privy-io/react-auth";
+import { useWallets } from "@privy-io/react-auth/solana";
+import { createClient } from "../lib/supabase/client";
+import {
+  signIntoSupabase,
+  signIntoSupabaseWithPrivy,
+} from "../lib/supabase/auth";
 
 interface ConnectButtonProps {
   className?: string;
@@ -27,7 +34,7 @@ interface ConnectButtonProps {
 export function ConnectButton({ className }: ConnectButtonProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
+  const { ready, user, authenticated } = usePrivy();
   const {
     isConnected,
     isConnecting,
@@ -37,9 +44,55 @@ export function ConnectButton({ className }: ConnectButtonProps) {
     clearWalletConnectUri,
   } = useConnector();
 
-  if (isConnected && account && connector) {
-    const shortAddress = `${account.slice(0, 4)}...${account.slice(-4)}`;
-    const walletIcon = connector.icon || undefined;
+  const supabase = createClient();
+
+  const { wallets } = useWallets();
+
+  async function manageSupabaseConnection() {
+    if (account) {
+      signIntoSupabase({
+        account,
+        supabase,
+      });
+    } else if (user && wallets.length) {
+      console.log(wallets);
+      const wallet = wallets.find((w) => w.standardWallet?.name === "Privy");
+      if (!wallet) {
+        throw new Error("No privy wallet");
+      }
+      signIntoSupabaseWithPrivy({
+        supabase,
+        wallet,
+        user,
+      });
+    }
+  }
+
+  useEffect(() => {
+    if (account || user) {
+      manageSupabaseConnection();
+    }
+  }, [account, user, wallets]);
+
+  async function checkSOn() {
+    const ss = await supabase.auth.getSession();
+    console.log(ss, "CHECK SESSIONSSS");
+  }
+
+  useEffect(() => {
+    if (user || account) {
+      console.log("CHECK", user, account);
+      checkSOn();
+    }
+  }, [user, account]);
+
+  const connectedToExternalWallet = isConnected && account && connector;
+  const connectedToEmbeddedWallet = ready && user && authenticated;
+  if (connectedToExternalWallet || connectedToEmbeddedWallet) {
+    const shortAddress = connectedToExternalWallet
+      ? truncate(account)
+      : truncate(user?.wallet?.address || "");
+    const walletIcon = connector?.icon || undefined;
 
     return (
       <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
@@ -51,7 +104,10 @@ export function ConnectButton({ className }: ConnectButtonProps) {
           >
             <Avatar className="h-5 w-5">
               {walletIcon && (
-                <AvatarImage src={walletIcon} alt={connector.name} />
+                <AvatarImage
+                  src={walletIcon}
+                  alt={connector?.name || "privy icon"}
+                />
               )}
               <AvatarFallback>
                 <Wallet className="h-3 w-3" />
@@ -72,9 +128,9 @@ export function ConnectButton({ className }: ConnectButtonProps) {
           className="p-0 rounded-[20px]"
         >
           <WalletDropdownContent
-            selectedAccount={account}
+            selectedAccount={account || user?.wallet?.address || "Privy"}
             walletIcon={walletIcon}
-            walletName={connector.name}
+            walletName={connector?.name || "Privy"}
           />
         </DropdownMenuContent>
       </DropdownMenu>
@@ -93,14 +149,12 @@ export function ConnectButton({ className }: ConnectButtonProps) {
 
   return (
     <>
-      <Button
-        size="sm"
-        variant="outline"
+      <button
         onClick={() => setIsModalOpen(true)}
-        className={className}
+        className="font-semibold text-gray-900 hover:text-gray-900 my-2 pl-3 pr-2 py-1.5 hover:bg-slate-500/5 rounded-md"
       >
         {buttonContent}
-      </Button>
+      </button>
       <WalletModal
         open={isModalOpen}
         onOpenChange={(open) => {

@@ -26,11 +26,6 @@
           "signer": true
         },
         {
-          "name": "asset_recipient",
-          "writable": true,
-          "signer": true
-        },
-        {
           "name": "gift",
           "writable": true,
           "pda": {
@@ -154,13 +149,13 @@
           }
         },
         {
-          "name": "asset_recipient_nft_ata",
+          "name": "authorized_claimer_nft_ata",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "account",
-                "path": "asset_recipient"
+                "path": "authorized_claimer"
               },
               {
                 "kind": "const",

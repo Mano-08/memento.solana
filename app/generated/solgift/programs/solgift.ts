@@ -17,12 +17,12 @@ import {
   type ReadonlyUint8Array,
 } from "@solana/kit";
 import {
+  parseCancelGiftInstruction,
   parseClaimGiftInstruction,
   parseCreateGiftInstruction,
-  parseInitializeUserInstruction,
+  type ParsedCancelGiftInstruction,
   type ParsedClaimGiftInstruction,
   type ParsedCreateGiftInstruction,
-  type ParsedInitializeUserInstruction,
 } from "../instructions";
 
 export const SOLGIFT_PROGRAM_ADDRESS =
@@ -65,15 +65,26 @@ export function identifySolgiftAccount(
 }
 
 export enum SolgiftInstruction {
+  CancelGift,
   ClaimGift,
   CreateGift,
-  InitializeUser,
 }
 
 export function identifySolgiftInstruction(
   instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): SolgiftInstruction {
   const data = "data" in instruction ? instruction.data : instruction;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([1, 35, 202, 245, 89, 105, 95, 135]),
+      ),
+      0,
+    )
+  ) {
+    return SolgiftInstruction.CancelGift;
+  }
   if (
     containsBytes(
       data,
@@ -96,17 +107,6 @@ export function identifySolgiftInstruction(
   ) {
     return SolgiftInstruction.CreateGift;
   }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([111, 17, 185, 250, 60, 122, 38, 254]),
-      ),
-      0,
-    )
-  ) {
-    return SolgiftInstruction.InitializeUser;
-  }
   throw new Error(
     "The provided instruction could not be identified as a solgift instruction.",
   );
@@ -116,20 +116,27 @@ export type ParsedSolgiftInstruction<
   TProgram extends string = "8UbHcmNUq5zRnYbdcjSPxqDdFAi6X58UsXgizstHZUbk",
 > =
   | ({
+      instructionType: SolgiftInstruction.CancelGift;
+    } & ParsedCancelGiftInstruction<TProgram>)
+  | ({
       instructionType: SolgiftInstruction.ClaimGift;
     } & ParsedClaimGiftInstruction<TProgram>)
   | ({
       instructionType: SolgiftInstruction.CreateGift;
-    } & ParsedCreateGiftInstruction<TProgram>)
-  | ({
-      instructionType: SolgiftInstruction.InitializeUser;
-    } & ParsedInitializeUserInstruction<TProgram>);
+    } & ParsedCreateGiftInstruction<TProgram>);
 
 export function parseSolgiftInstruction<TProgram extends string>(
   instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
 ): ParsedSolgiftInstruction<TProgram> {
   const instructionType = identifySolgiftInstruction(instruction);
   switch (instructionType) {
+    case SolgiftInstruction.CancelGift: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: SolgiftInstruction.CancelGift,
+        ...parseCancelGiftInstruction(instruction),
+      };
+    }
     case SolgiftInstruction.ClaimGift: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -142,13 +149,6 @@ export function parseSolgiftInstruction<TProgram extends string>(
       return {
         instructionType: SolgiftInstruction.CreateGift,
         ...parseCreateGiftInstruction(instruction),
-      };
-    }
-    case SolgiftInstruction.InitializeUser: {
-      assertIsInstructionWithAccounts(instruction);
-      return {
-        instructionType: SolgiftInstruction.InitializeUser,
-        ...parseInitializeUserInstruction(instruction),
       };
     }
     default:

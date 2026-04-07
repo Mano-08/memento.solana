@@ -21,8 +21,6 @@ import {
   getStructEncoder,
   getU16Decoder,
   getU16Encoder,
-  getU8Decoder,
-  getU8Encoder,
   transformEncoder,
   type Account,
   type Address,
@@ -45,13 +43,9 @@ export function getUserDiscriminatorBytes() {
   return fixEncoderSize(getBytesEncoder(), 8).encode(USER_DISCRIMINATOR);
 }
 
-export type User = {
-  discriminator: ReadonlyUint8Array;
-  count: number;
-  bump: number;
-};
+export type User = { discriminator: ReadonlyUint8Array; count: number };
 
-export type UserArgs = { count: number; bump: number };
+export type UserArgs = { count: number };
 
 /** Gets the encoder for {@link UserArgs} account data. */
 export function getUserEncoder(): FixedSizeEncoder<UserArgs> {
@@ -59,7 +53,6 @@ export function getUserEncoder(): FixedSizeEncoder<UserArgs> {
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["count", getU16Encoder()],
-      ["bump", getU8Encoder()],
     ]),
     (value) => ({ ...value, discriminator: USER_DISCRIMINATOR }),
   );
@@ -70,7 +63,6 @@ export function getUserDecoder(): FixedSizeDecoder<User> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["count", getU16Decoder()],
-    ["bump", getU8Decoder()],
   ]);
 }
 
@@ -133,5 +125,5 @@ export async function fetchAllMaybeUser(
 }
 
 export function getUserSize(): number {
-  return 11;
+  return 10;
 }

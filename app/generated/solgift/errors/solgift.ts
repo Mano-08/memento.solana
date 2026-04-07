@@ -32,12 +32,15 @@ export const SOLGIFT_ERROR__INVALID_SALT = 0x1776; // 6006
 export const SOLGIFT_ERROR__NOT_AN_N_F_T = 0x1777; // 6007
 /** MintAuthorityNotRevoked: NFT mint authority not revoked */
 export const SOLGIFT_ERROR__MINT_AUTHORITY_NOT_REVOKED = 0x1778; // 6008
+/** GiftNotReadyYet: Gift in locked state, will open on delivery date! */
+export const SOLGIFT_ERROR__GIFT_NOT_READY_YET = 0x1779; // 6009
 
 export type SolgiftError =
   | typeof SOLGIFT_ERROR__BELOW_MINIMUM_AMOUNT
   | typeof SOLGIFT_ERROR__CANNOT_GIFT_TO_PAST
   | typeof SOLGIFT_ERROR__CANNOT_GIFT_TO_SELF
   | typeof SOLGIFT_ERROR__DELIVERY_DATE_MUST_BE_IN_FUTURE
+  | typeof SOLGIFT_ERROR__GIFT_NOT_READY_YET
   | typeof SOLGIFT_ERROR__INVALID_ANSWER_HASH
   | typeof SOLGIFT_ERROR__INVALID_RECEIVER
   | typeof SOLGIFT_ERROR__INVALID_SALT
@@ -51,6 +54,7 @@ if (process.env.NODE_ENV !== "production") {
     [SOLGIFT_ERROR__CANNOT_GIFT_TO_PAST]: `Cannot gift to past`,
     [SOLGIFT_ERROR__CANNOT_GIFT_TO_SELF]: `Cannot gift to self`,
     [SOLGIFT_ERROR__DELIVERY_DATE_MUST_BE_IN_FUTURE]: `Delivery date must be in future`,
+    [SOLGIFT_ERROR__GIFT_NOT_READY_YET]: `Gift in locked state, will open on delivery date!`,
     [SOLGIFT_ERROR__INVALID_ANSWER_HASH]: `Invalid answer hash`,
     [SOLGIFT_ERROR__INVALID_RECEIVER]: `Receiver public key is invalid`,
     [SOLGIFT_ERROR__INVALID_SALT]: `Invalid salt`,

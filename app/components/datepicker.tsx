@@ -11,12 +11,12 @@ import {
 import { format, isBefore, startOfDay } from "date-fns";
 import { ChevronDownIcon } from "lucide-react";
 
-interface DatePickerDemoProps {
+interface DatePickerProps {
   birthday: Date | null;
   setBirthday: (date: Date) => void;
 }
 
-export function DatePickerDemo({ birthday, setBirthday }: DatePickerDemoProps) {
+export function DatePicker({ birthday, setBirthday }: DatePickerProps) {
   // Ensure that today is always the minimum selectable date
   const today = startOfDay(new Date());
 
@@ -32,7 +32,7 @@ export function DatePickerDemo({ birthday, setBirthday }: DatePickerDemoProps) {
         <Button
           variant="outline"
           data-empty={!birthday}
-          className="w-[212px] justify-between text-left font-normal data-[empty=true]:text-muted-foreground"
+          className="w-[212px] justify-between rounded-full text-left font-normal data-[empty=true]:text-muted-foreground"
         >
           {birthday ? format(birthday, "PPP") : <span>Pick a date</span>}
           <ChevronDownIcon />

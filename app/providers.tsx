@@ -2,15 +2,13 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useMemo } from "react";
+import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
+
 import {
-  AppProvider,
+  ConnectorProvider,
   getDefaultConfig,
   getDefaultMobileConfig,
 } from "@solana/connector/react";
-import { useCreateWallet } from "@privy-io/react-auth/solana";
-
-import { createRemoteSignerWallet } from "@solana/connector/remote";
-import { SolanaProvider } from "@solana/react-hooks";
 
 const getOrigin = () => {
   if (typeof window !== "undefined") {
@@ -20,11 +18,6 @@ const getOrigin = () => {
 };
 
 import { PrivyProvider } from "@privy-io/react-auth";
-
-// Enable remote signer via environment variable (set NEXT_PUBLIC_ENABLE_REMOTE_SIGNER=true)
-// For testing, default to true if not explicitly set to 'false'
-const ENABLE_REMOTE_SIGNER = true;
-// process.env.NEXT_PUBLIC_ENABLE_REMOTE_SIGNER !== "false";
 
 export function Providers({ children }: { children: ReactNode }) {
   const connectorConfig = useMemo(() => {
@@ -54,10 +47,6 @@ export function Providers({ children }: { children: ReactNode }) {
       },
     ];
 
-    // Create remote signer wallet if enabled
-    // This wallet delegates signing to the /api/privy-signer endpoint
-    console.log("origin", origin);
-
     return getDefaultConfig({
       appName: "ConnectorKit Example",
       appUrl: origin,
@@ -83,45 +72,90 @@ export function Providers({ children }: { children: ReactNode }) {
   );
 
   // Mount devtools in development mode
-  // useEffect(() => {
-  //   if (process.env.NODE_ENV !== "development") return;
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
 
-  //   let devtools:
-  //     | { mount: (el: HTMLElement) => void; unmount: () => void }
-  //     | undefined;
-  //   let container: HTMLDivElement | undefined;
+    let devtools:
+      | { mount: (el: HTMLElement) => void; unmount: () => void }
+      | undefined;
+    let container: HTMLDivElement | undefined;
 
-  //   // // Dynamic import to avoid bundling in production
-  //   // import("@solana/devtools").then(({ ConnectorDevtools }) => {
-  //   //   // Create container for devtools
-  //   //   container = document.createElement("div");
-  //   //   container.id = "connector-devtools-container";
-  //   //   document.body.appendChild(container);
+    // // Dynamic import to avoid bundling in production
+    // import("@solana/devtools").then(({ ConnectorDevtools }) => {
+    //   // Create container for devtools
+    //   container = document.createElement("div");
+    //   container.id = "connector-devtools-container";
+    //   document.body.appendChild(container);
 
-  //   //   // Create and mount devtools (auto-detects window.__connectorClient)
-  //   //   devtools = new ConnectorDevtools({
-  //   //     config: {
-  //   //       position: "bottom-right",
-  //   //       theme: "dark",
-  //   //       defaultOpen: false,
-  //   //       rpcUrl: process.env.NEXT_PUBLIC_RPC_URL,
-  //   //     },
-  //   //   });
-  //   //   devtools.mount(container);
-  //   // });
+    //   // Create and mount devtools (auto-detects window.__connectorClient)
+    //   devtools = new ConnectorDevtools({
+    //     config: {
+    //       position: "bottom-right",
+    //       theme: "dark",
+    //       defaultOpen: false,
+    //       rpcUrl: process.env.NEXT_PUBLIC_RPC_URL,
+    //     },
+    //   });
+    //   devtools.mount(container);
+    // });
 
-  //   // Cleanup on unmount
-  //   return () => {
-  //     devtools?.unmount();
-  //     container?.remove();
-  //   };
-  // }, []);
+    // Cleanup on unmount
+    return () => {
+      devtools?.unmount();
+      container?.remove();
+    };
+  }, []);
 
   return (
-    <PrivyProvider appId={`${process.env.NEXT_PUBLIC_PRIVY_APP_ID}`}>
-      <AppProvider connectorConfig={connectorConfig} mobile={mobile}>
+    <ConnectorProvider config={connectorConfig} mobile={mobile}>
+      <PrivyProvider
+        key={"doko"}
+        appId={`${process.env.NEXT_PUBLIC_PRIVY_APP_ID}`}
+        config={{
+          embeddedWallets: {
+            solana: {
+              createOnLogin: "all-users",
+            },
+            priceDisplay: {
+              primary: "fiat-currency",
+              secondary: "native-token",
+            },
+          },
+          loginMethods: ["email"],
+          appearance: {
+            walletList: ["phantom", "backpack", "detected_solana_wallets"],
+            walletChainType: "solana-only",
+          },
+          // externalWallets: {
+          //   solana: {
+          //     // if not specified, solana wallets will show but connector won't work and defaults to opening the wallet installation page
+          //     connectors: toSolanaWalletConnectors({ shouldAutoConnect: true }),
+          //   },
+          // },
+
+          solana: {
+            rpcs: {
+              "solana:mainnet": {
+                // rpc: createSolanaRpc("https://api.mainnet-beta.solana.com"),
+                rpc: createSolanaRpc(
+                  "https://mainnet.helius-rpc.com/?api-key=568f70c7-8c96-4cd2-b1b0-904855733cea"
+                ),
+                rpcSubscriptions: createSolanaRpcSubscriptions(
+                  "wss://api.mainnet-beta.solana.com"
+                ),
+              },
+              "solana:devnet": {
+                rpc: createSolanaRpc("https://api.devnet.solana.com"),
+                rpcSubscriptions: createSolanaRpcSubscriptions(
+                  "wss://api.devnet.solana.com"
+                ),
+              },
+            },
+          },
+        }}
+      >
         {children}
-      </AppProvider>
-    </PrivyProvider>
+      </PrivyProvider>
+    </ConnectorProvider>
   );
 }

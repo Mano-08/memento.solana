@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/app/lib/supabase/server";
+import { createSupabaseServer } from "@/app/lib/supabase/server";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ gift_id: string }> }
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = await createSupabaseServer();
     const giftId = (await params).gift_id;
 
     // Query the gifts table for the row with gift_id = giftId.

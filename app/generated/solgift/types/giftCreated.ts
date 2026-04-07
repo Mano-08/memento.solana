@@ -10,10 +10,12 @@ import {
   combineCodec,
   getAddressDecoder,
   getAddressEncoder,
+  getI64Decoder,
+  getI64Encoder,
   getStructDecoder,
   getStructEncoder,
-  getU64Decoder,
-  getU64Encoder,
+  getU16Decoder,
+  getU16Encoder,
   type Address,
   type FixedSizeCodec,
   type FixedSizeDecoder,
@@ -25,6 +27,7 @@ export type GiftCreated = {
   sender: Address;
   authorizedClaimer: Address;
   createdOn: bigint;
+  idx: number;
 };
 
 export type GiftCreatedArgs = {
@@ -32,6 +35,7 @@ export type GiftCreatedArgs = {
   sender: Address;
   authorizedClaimer: Address;
   createdOn: number | bigint;
+  idx: number;
 };
 
 export function getGiftCreatedEncoder(): FixedSizeEncoder<GiftCreatedArgs> {
@@ -39,7 +43,8 @@ export function getGiftCreatedEncoder(): FixedSizeEncoder<GiftCreatedArgs> {
     ["gift", getAddressEncoder()],
     ["sender", getAddressEncoder()],
     ["authorizedClaimer", getAddressEncoder()],
-    ["createdOn", getU64Encoder()],
+    ["createdOn", getI64Encoder()],
+    ["idx", getU16Encoder()],
   ]);
 }
 
@@ -48,7 +53,8 @@ export function getGiftCreatedDecoder(): FixedSizeDecoder<GiftCreated> {
     ["gift", getAddressDecoder()],
     ["sender", getAddressDecoder()],
     ["authorizedClaimer", getAddressDecoder()],
-    ["createdOn", getU64Decoder()],
+    ["createdOn", getI64Decoder()],
+    ["idx", getU16Decoder()],
   ]);
 }
 

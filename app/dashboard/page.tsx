@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { bricolage, spaceMono } from "../fonts/fonts";
-import Gifts from "../components/ui/tabs";
+import Gifts from "../components/tabs";
 
 export default function home() {
   return (

@@ -10,6 +10,8 @@ import {
   combineCodec,
   getAddressDecoder,
   getAddressEncoder,
+  getI64Decoder,
+  getI64Encoder,
   getStructDecoder,
   getStructEncoder,
   type Address,
@@ -18,14 +20,23 @@ import {
   type FixedSizeEncoder,
 } from "@solana/kit";
 
-export type GiftClaimed = { gift: Address; claimer: Address };
+export type GiftClaimed = {
+  gift: Address;
+  claimer: Address;
+  claimedOn: bigint;
+};
 
-export type GiftClaimedArgs = GiftClaimed;
+export type GiftClaimedArgs = {
+  gift: Address;
+  claimer: Address;
+  claimedOn: number | bigint;
+};
 
 export function getGiftClaimedEncoder(): FixedSizeEncoder<GiftClaimedArgs> {
   return getStructEncoder([
     ["gift", getAddressEncoder()],
     ["claimer", getAddressEncoder()],
+    ["claimedOn", getI64Encoder()],
   ]);
 }
 
@@ -33,6 +44,7 @@ export function getGiftClaimedDecoder(): FixedSizeDecoder<GiftClaimed> {
   return getStructDecoder([
     ["gift", getAddressDecoder()],
     ["claimer", getAddressDecoder()],
+    ["claimedOn", getI64Decoder()],
   ]);
 }
 

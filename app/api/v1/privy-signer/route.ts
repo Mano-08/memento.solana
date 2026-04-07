@@ -91,6 +91,21 @@ function getProviderConfig(): ProviderConfig {
   };
 }
 
+/**
+ * To enable your Privy-backed remote signer to work on localhost as well as in production (e.g. on Vercel),
+ * make sure to add http://localhost:3000 (or whatever your local dev origin is) to your allowed server origins
+ * in the Privy developer dashboard under "API Settings" > "Server Wallet" > "Allowed origins".
+ *
+ * If you are using Privy server wallets, go to:
+ *   https://dashboard.privy.io > Your App > Wallets > Server Wallets
+ * And ensure that "http://localhost:3000" (and/or "http://127.0.0.1:3000") are added as allowed origins.
+ *
+ * Otherwise, Privy will block API requests from localhost origins for security reasons.
+ *
+ * No code change is needed in this handler, but ensure your .env contains the Privy credentials
+ * and that your local origin is permitted in Privy's dashboard.
+ */
+
 // Create route handlers
 const { GET, POST } = createRemoteSignerRouteHandlers({
   provider: getProviderConfig(),
@@ -127,7 +142,7 @@ const { GET, POST } = createRemoteSignerRouteHandlers({
 
   // Wallet metadata
   name: "Treasury Signer",
-  chains: ["solana:mainnet", "solana:devnet"],
+  chains: ["solana:devnet"],
 });
 
 export { GET, POST };

@@ -6,6 +6,6 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./cancelGift";
 export * from "./claimGift";
 export * from "./createGift";
-export * from "./initializeUser";

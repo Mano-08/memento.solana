@@ -1,11 +1,24 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/app/lib/supabase/server";
+import { NextRequest } from "next/server";
+import { createSupabaseServer } from "@/app/lib/supabase/server"; // use the SSR server client
 
 export async function POST(req: NextRequest) {
   try {
     const insertData = await req.json();
-    const supabase = await createClient();
-    const { error } = await supabase.from("gifts").insert([insertData]);
+    const supabase = await createSupabaseServer();
+
+    const { data: claims, error: authError } = await supabase.auth.getClaims();
+
+    console.log("SERVER: ", claims);
+    if (authError || !claims) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const safeInsertData = {
+      ...insertData,
+      sender: claims.claims.user_metadata!.sub.split(":").pop(),
+    };
+
+    const { error } = await supabase.from("gifts").insert([safeInsertData]);
 
     if (error) {
       console.log(error);

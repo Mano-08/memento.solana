@@ -119,24 +119,46 @@ This uses [Codama](https://github.com/codama-idl/codama) to generate a type-safe
 
 solana-test-validator --bpf-program metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s anchor/mpl_token_metadata.so --reset
 
+DEADLINES:
+
+[] build create-gift UI for Demo
+[] build claim-gift UI for Demo
+[] change DB schema
+
+per user we have gift count: so all the gifts upto that index is claimed or not_claimed or cancelled.
+db stores gift_id and encrypted question
+gift_created_DB -> [gift_pda] [gift_index] [encrypted_question] [gift_sender]
+gift_claimed_DB -> [claimer_wallet] [gift_pda]
+
 TODO;
+
+[DONE] create gift should not throw simuation failed error -> work on chain
+
+[DONE] claim gift -> no rent or orphan account should be present
+
+[DONE] 6. preview gift
 
 [DONE] 1. send claimed recipeitne + gift pda to DB
 
-3. connect to supabase with, privy, react wallet everything weaved together.
+[DONE] 5.a. dont close gift pda, instead add gift claimed_on details
 
-4. update landing page UI for demo
+[DONE] 8. Accept gift on same day as valid ; ex created at 530 pm, then delivery date is also 530+1 pm given its the same day
 
-5. hCaptha integration
-
-6. refactor + push to vercel today
-
-7. add RLS in supabase
-
-8. make navbar taller
-
-9. fix Wallet connector UI issue
+[DONE] 9. fix Wallet connector UI issue
 
 [DONE] 4. ceaate delivery date + creted on date in DB
 
 [DONE] 5. received gift should populate with info
+
+[DONE] 10. build dashboard
+
+[I] 3.⁠ ⁠Cron job
+[I] 4.⁠ ⁠Claim gift (1st thing is connecr wallet)
+[I] 5.⁠ ⁠With privy wallet have no popup for signing transaction
+[I] 6.⁠ ⁠Dashboard
+
+/create page
+[I] 1.⁠ ⁠Connect wallet at /create
+[I] 2.⁠ ⁠Popup while gift creation
+[I] 3. shiny image effect (redesign wrap page)
+[I] 4. toaster/popups

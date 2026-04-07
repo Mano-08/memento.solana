@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/app/lib/supabase/server";
+import { createSupabaseServer } from "@/app/lib/supabase/server";
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createSupabaseServer();
 
     // Read recipient and gift_pda from the POSTed JSON body (not params)
     const body = await req.json();

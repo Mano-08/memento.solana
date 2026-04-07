@@ -14,6 +14,8 @@ import {
   getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
+  getI64Decoder,
+  getI64Encoder,
   getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
@@ -117,7 +119,7 @@ export function getCreateGiftInstructionDataEncoder(): FixedSizeEncoder<CreateGi
       ["salt", fixEncoderSize(getBytesEncoder(), 32)],
       ["answerHash", fixEncoderSize(getBytesEncoder(), 32)],
       ["solAmount", getU64Encoder()],
-      ["deliveryDate", getU64Encoder()],
+      ["deliveryDate", getI64Encoder()],
       ["authorizedClaimer", getAddressEncoder()],
     ]),
     (value) => ({ ...value, discriminator: CREATE_GIFT_DISCRIMINATOR }),
@@ -130,7 +132,7 @@ export function getCreateGiftInstructionDataDecoder(): FixedSizeDecoder<CreateGi
     ["salt", fixDecoderSize(getBytesDecoder(), 32)],
     ["answerHash", fixDecoderSize(getBytesDecoder(), 32)],
     ["solAmount", getU64Decoder()],
-    ["deliveryDate", getU64Decoder()],
+    ["deliveryDate", getI64Decoder()],
     ["authorizedClaimer", getAddressDecoder()],
   ]);
 }

@@ -1,7 +1,10 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { CreateGiftData } from "./types";
+import { DateTime } from "luxon";
 import {
+  address,
+  Address,
   appendTransactionMessageInstructions,
   assertIsSendableTransaction,
   assertIsTransactionWithBlockhashLifetime,
@@ -9,18 +12,25 @@ import {
   getBase64EncodedWireTransaction,
   getSignatureFromTransaction,
   Instruction,
+  KeyPairSigner,
   pipe,
   Rpc,
   RpcSubscriptions,
   sendAndConfirmTransactionFactory,
   setTransactionMessageFeePayer,
-  setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
+  SignatureDictionary,
   signTransactionMessageWithSigners,
   SolanaRpcApi,
   SolanaRpcSubscriptionsApi,
+  Transaction,
+  TransactionPartialSigner,
+  TransactionPartialSignerConfig,
   TransactionSigner,
+  TransactionWithinSizeLimit,
+  TransactionWithLifetime,
 } from "@solana/kit";
+import { ConnectedStandardSolanaWallet } from "@privy-io/react-auth/solana";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -186,4 +196,186 @@ export function validateGiftCreationInputs(
     throw new Error("Security question is required");
   }
   return true;
+}
+
+export function truncate(account: string) {
+  return `${account.slice(0, 4)}...${account.slice(-4)}`;
+}
+
+export function validateDeliveryDate(deliveryDate: Date): {
+  valid: boolean;
+  error?: string;
+} {
+  const now = DateTime.now(); // User's local timezone
+  const delivery = DateTime.fromJSDate(deliveryDate);
+
+  // Get start of today in user's timezone
+  const todayStart = now.startOf("day");
+  const deliveryStart = delivery.startOf("day");
+
+  // Must be today or future
+  if (deliveryStart < todayStart) {
+    return {
+      valid: false,
+      error: "Cannot schedule gifts in the past",
+    };
+  }
+
+  // Convert to UTC Unix timestamp for Solana
+  const deliveryTimestamp = Math.floor(delivery.toSeconds());
+
+  return { valid: true };
+}
+
+import { getTransactionEncoder, getTransactionDecoder } from "@solana/kit";
+
+export function createPrivySigner(
+  wallet: ConnectedStandardSolanaWallet
+): TransactionPartialSigner {
+  const walletAddress: Address = address(wallet.address);
+
+  return {
+    address: walletAddress,
+    signTransactions: async (
+      transactions: readonly (Transaction &
+        TransactionWithinSizeLimit &
+        TransactionWithLifetime)[],
+      _config?: TransactionPartialSignerConfig
+    ): Promise<readonly SignatureDictionary[]> => {
+      console.log(
+        `[Privy-Signer] invoked for ${transactions.length} transaction(s)`
+      );
+
+      const encoder = getTransactionEncoder();
+      const decoder = getTransactionDecoder();
+
+      try {
+        const results = await Promise.all(
+          transactions.map(async (tx, index) => {
+            try {
+              console.log(
+                `[Privy-Signer] Encoding transaction ${index + 1}/${transactions.length}...`
+              );
+
+              // Encode to ReadonlyUint8Array
+              const txBytes = encoder.encode(tx);
+
+              // Convert to mutable Uint8Array (Privy requirement)
+              const mutableTxBytes = new Uint8Array(txBytes);
+
+              console.log(
+                `[Privy-Signer] Signing transaction ${index + 1}/${transactions.length}...`
+              );
+
+              // Sign with Privy wallet
+              const { signedTransaction } = await wallet.signTransaction({
+                transaction: mutableTxBytes,
+              });
+
+              console.log(
+                `[Privy-Signer] Decoding signed transaction ${index + 1}...`
+              );
+
+              // Decode the signed transaction
+              const decodedTx = decoder.decode(signedTransaction);
+
+              // Extract the signature
+              // console.log(decodedTx);
+              const signature = decodedTx.signatures[address(wallet.address)];
+              if (!signature) throw new Error("No Signature");
+              console.log(
+                `[Privy-Signer] ✅ Transaction ${index + 1} signed:`,
+                signature
+              );
+
+              // Return type: { [address: string]: SignatureBytes }
+              return {
+                [address(wallet.address)]: signature,
+              };
+            } catch (error) {
+              console.error(
+                `[Privy-Signer] ❌ Error signing transaction ${index + 1}:`,
+                error
+              );
+              throw new Error(
+                `[Privy-Signer] Failed to sign transaction ${index + 1}: ${
+                  error instanceof Error ? error.message : String(error)
+                }`
+              );
+            }
+          })
+        );
+
+        console.log(
+          `[Privy-Signer] ✅ All ${transactions.length} transaction(s) signed successfully`
+        );
+        return results;
+      } catch (error) {
+        console.error("[Privy-Signer] ❌ Error in signTransactions:", error);
+        throw error;
+      }
+    },
+  };
+}
+
+export function createAuthorizedRecipientSigner(
+  signer: KeyPairSigner<string>
+): TransactionPartialSigner {
+  return {
+    address: signer.address,
+    signTransactions: async (
+      transactions: readonly (Transaction &
+        TransactionWithinSizeLimit &
+        TransactionWithLifetime)[],
+      _config?: TransactionPartialSignerConfig
+    ): Promise<readonly SignatureDictionary[]> => {
+      console.log(
+        `[Authorized-Recipient] signer invoked for ${transactions.length} transaction(s)`
+      );
+      return signer.signTransactions(transactions);
+
+      try {
+        const results = await Promise.all(
+          transactions.map(async (tx, index) => {
+            try {
+              console.log(
+                `[Authorized-Recipient] Signing transaction ${index + 1} with keypair...`
+              );
+
+              // KeyPairSigner has a signTransactions method that takes TransactionMessage
+              // We need to sign the raw transaction
+              const [signedTx] = await signer.signTransactions([tx]);
+
+              const signature = signedTx[signer.address];
+
+              // Decode to extract the signature
+              console.log(
+                `[Authorized-Recipient] ✅ Transaction ${index + 1} signed:`,
+                signature
+              );
+
+              return {
+                signature,
+                publicKey: signer.address,
+              };
+            } catch (error) {
+              console.error(
+                `[Authorized-Recipient] ❌ Error signing transaction ${index + 1}:`,
+                error
+              );
+              throw error;
+            }
+          })
+        );
+
+        return results;
+      } catch (error) {
+        console.error(
+          "[Authorized-Recipient] ❌ Error in signTransactions:",
+          error
+        );
+        throw error;
+      }
+    },
+  };
 }

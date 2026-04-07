@@ -1,6 +1,7 @@
 "use client";
 
-import { spaceMono } from "@/app/fonts/fonts";
+import { usePrivy } from "@privy-io/react-auth"; // or from wherever your wallet hook comes
+import { useSignTransaction, useWallets } from "@privy-io/react-auth/solana";
 import {
   CreateGiftInput,
   fetchGift,
@@ -8,6 +9,7 @@ import {
   Gift,
   GiftClaimed,
 } from "@/app/generated/solgift";
+import { getAddMemoInstruction } from "@solana-program/memo";
 import { decryptQuestion, recursiveSha256 } from "@/app/helper/compute";
 import { RECURSIVE_HASH_DEPTH } from "@/app/helper/constants";
 import {
@@ -16,35 +18,59 @@ import {
 } from "@metaplex-foundation/mpl-token-metadata-kit";
 import { TOKEN_PROGRAM_ADDRESS } from "@solana-program/token";
 import {
+  address,
   Address,
   appendTransactionMessageInstructions,
+  assertIsFullySignedTransaction,
+  assertIsTransactionMessageWithBlockhashLifetime,
   assertIsTransactionWithBlockhashLifetime,
+  compileTransaction,
   createKeyPairSignerFromBytes,
   createKeyPairSignerFromPrivateKeyBytes,
+  createNoopSigner,
   createSolanaRpc,
   createSolanaRpcSubscriptions,
   createTransactionMessage,
   generateKeyPairSigner,
   getBase64EncodedWireTransaction,
   getSignatureFromTransaction,
+  getTransactionDecoder,
+  getTransactionEncoder,
   Instruction,
+  KeyPairSigner,
+  lamports,
+  partiallySignTransaction,
+  partiallySignTransactionMessageWithSigners,
   pipe,
   sendAndConfirmTransactionFactory,
   setTransactionMessageFeePayer,
+  setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   signTransactionMessageWithSigners,
   TransactionSigner,
 } from "@solana/kit";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useConnector } from "@solana/connector/react";
+import {
+  createAuthorizedRecipientSigner,
+  createPrivySigner,
+} from "@/app/lib/utils";
+import { WalletModal } from "@/app/components/wallet-modal";
+import { getTransferSolInstruction } from "@solana-program/system";
+// import { createPrivyPartialSigner } from "@/app/lib/utils";
 
-const rpc = createSolanaRpc("http://127.0.0.1:8899");
-const rpcSubscriptions = createSolanaRpcSubscriptions("ws://127.0.0.1:8900");
+const rpc = createSolanaRpc("https://api.devnet.solana.com");
+const rpcSubscriptions = createSolanaRpcSubscriptions(
+  "ws://api.devnet.solana.com"
+);
+
 // const SOLGIFT_PROGRAM_ADDRESS: Address = idl.address as Address;
 
 // This page pulls the gift_pda from the URL, then sets up React state hooks
 export default function Page() {
   const encoder = new TextEncoder();
+  const params = useParams();
   function handleSetSecurityAnswer(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value;
     // Allow only English letters, ignore numbers, specials, spaces
@@ -66,7 +92,24 @@ export default function Page() {
     }
     setAnswer(filtered);
   }
-  const params = useParams();
+  const { wallets } = useWallets();
+
+  const { ready, user, authenticated } = usePrivy();
+  // console.log(ready, user, authenticated, "HIANDY");
+  const {
+    isConnected,
+    isConnecting,
+    account,
+    connector,
+    walletConnectUri,
+    clearWalletConnectUri,
+  } = useConnector();
+
+  const connectedToExternalWallet = isConnected && account && connector;
+  const connectedToEmbeddedWallet = ready && user && authenticated;
+
+  console.log(connectedToEmbeddedWallet, "connectedToEmbeddedWallet --anakns ");
+
   // gift_pda is the param key from /claim/[gift_pda]
   const gift_pda =
     typeof params === "object" && params !== null
@@ -77,6 +120,7 @@ export default function Page() {
   const [phone, setPhone] = useState<string>("");
   const [answer, setAnswer] = useState<string>("");
   const [decrypted, setDecrypted] = useState<string>("");
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
   // Fetch cipher and gift data
   useEffect(() => {
@@ -108,8 +152,14 @@ export default function Page() {
   }
 
   async function claimGift(answer: string) {
-    const privyWallet = await generateKeyPairSigner();
-    console.log(privyWallet);
+    if (!(connectedToEmbeddedWallet || connectedToExternalWallet)) return;
+
+    const wallet = wallets.find((w) => w.standardWallet?.name === "Privy");
+    if (!wallet) {
+      throw new Error("No privy wallet");
+    }
+    const signer = createPrivySigner(wallet);
+
     const salt = gift.data.salt;
     const combined = new Uint8Array([
       ...encoder.encode(answer),
@@ -132,11 +182,16 @@ export default function Page() {
     );
     const authorizedClaimerKeypair =
       await createKeyPairSignerFromPrivateKeyBytes(new Uint8Array(seed));
+    // console.log(authorizedClaimerKeypair);
+    // return;
+    const payer = createAuthorizedRecipientSigner(authorizedClaimerKeypair);
+    console.log(payer.address, "AUTHORAIZED CLAIMER");
 
-    if (authorizedClaimerKeypair.address !== gift.data.authorizedClaimer) {
+    if (payer.address !== gift.data.authorizedClaimer) {
       throw new Error("UNAUTHORIZEDC LCAIMER");
       return;
     }
+    console.log("ddd");
     // setAuthorizedClaimer();
     const [giftNftAta] = await findAssociatedTokenPda({
       mint: gift.data.nftMint,
@@ -145,42 +200,100 @@ export default function Page() {
     });
     const [assetRecipientNftAta] = await findAssociatedTokenPda({
       mint: gift.data.nftMint,
-      owner: privyWallet.address as Address,
+      owner: address(wallet.address),
       tokenProgram: TOKEN_PROGRAM_ADDRESS,
     });
+    console.log(
+      {
+        authorizedClaimer: payer,
+        assetRecipient: signer,
+        gift: address(gift_pda),
+        nftMint: gift.data.nftMint,
+        giftNftAta: giftNftAta,
+        assetRecipientNftAta: assetRecipientNftAta,
+        answerHash: answerHash,
+      },
+      "CLAIM GIFT INFOR"
+    );
     const claimGiftIx = getClaimGiftInstruction({
-      authorizedClaimer: authorizedClaimerKeypair,
-      assetRecipient: privyWallet,
-      gift: gift_pda as Address,
+      authorizedClaimer: payer,
+      assetRecipient: signer,
+      gift: address(gift_pda),
       nftMint: gift.data.nftMint,
       giftNftAta: giftNftAta,
       assetRecipientNftAta: assetRecipientNftAta,
       answerHash: answerHash,
     });
+
+    console.log("NFT MINT ADDRSEE", gift.data.nftMint);
     const instructions = [];
     instructions.push(claimGiftIx);
 
+    const { value: sol_left } = await rpc
+      .getBalance(authorizedClaimerKeypair.address)
+      .send();
+
+    const emptyAuthorizedClaimerIx = getTransferSolInstruction({
+      source: authorizedClaimerKeypair,
+      destination: gift.data.sender,
+      amount: sol_left - lamports(5000n),
+    });
+    const instructions_2: Instruction[] = [];
+    instructions_2.push(emptyAuthorizedClaimerIx);
+
     async function sendAndConfirm(options: {
       instructions: Instruction[];
-      payer: TransactionSigner;
+      payer: TransactionSigner<string>;
     }) {
       const { instructions, payer } = options;
 
+      // const transactionMessage = pipe(
+      //   createTransactionMessage({ version: 0 }),
+      //   (tx) => setTransactionMessageFeePayer(payer.address, tx),
+
+      //   (tx) => appendTransactionMessageInstructions(instructions, tx)
+      // );
+      const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+
       const transactionMessage = pipe(
         createTransactionMessage({ version: 0 }),
-        (tx) => setTransactionMessageFeePayer(payer.address, tx),
+        (tx) => setTransactionMessageFeePayerSigner(payer, tx),
+        (tx) =>
+          appendTransactionMessageInstructions(
+            [
+              getAddMemoInstruction({
+                memo: "adding signer",
+                signers: [payer, signer],
+              }),
+            ],
+            tx
+          ),
+        (tx) =>
+          setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
         (tx) => appendTransactionMessageInstructions(instructions, tx)
       );
 
-      const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
-
-      const txWithLifetime = setTransactionMessageLifetimeUsingBlockhash(
-        latestBlockhash,
-        transactionMessage
-      );
-
       const signedTransaction =
-        await signTransactionMessageWithSigners(txWithLifetime);
+        await signTransactionMessageWithSigners(transactionMessage);
+
+      // Check if transaction is sendable & has expected signatures
+      assertIsTransactionWithBlockhashLifetime(signedTransaction);
+      assertIsFullySignedTransaction(signedTransaction);
+
+      // Print all signer addresses who have successfully signed
+      // The signatures are stored as an array matching the staticKeys/publicKeys in the transaction
+      // Print out which public keys have a signature
+      const transactionSigners = signedTransaction.signatures;
+
+      console.log("✅ Signers signature status:");
+      Object.entries(transactionSigners).forEach(([address, signature], i) => {
+        const hasSignature = signature !== null;
+        if (hasSignature) {
+          console.log(`  [${i}] Signed: ${address}`);
+        } else {
+          console.log(`  [${i}] NOT SIGNED: ${address}`);
+        }
+      });
 
       assertIsTransactionWithBlockhashLifetime(signedTransaction);
 
@@ -235,6 +348,9 @@ export default function Page() {
           signedTransaction,
           { commitment: "confirmed" }
         );
+        console.log(
+          "WAS JUST ABOUT TO SEND THE TRANSACTION VIA sendAndConfirmTransactionFactory"
+        );
       } catch (err: any) {
         // @solana/kit wraps the RPC error — the logs are in err.context
         console.error("❌ Send failed:", err?.message);
@@ -265,14 +381,31 @@ export default function Page() {
 
     const sx = await sendAndConfirm({
       instructions,
-      payer: authorizedClaimerKeypair,
+      payer: payer,
     });
 
+    const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+
+    const transactionMessage = pipe(
+      createTransactionMessage({ version: 0 }),
+      (tx) => setTransactionMessageFeePayerSigner(authorizedClaimerKeypair, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+      (tx) => appendTransactionMessageInstructions(instructions_2, tx)
+    );
+
+    const signedTransaction =
+      await signTransactionMessageWithSigners(transactionMessage);
+    assertIsTransactionWithBlockhashLifetime(signedTransaction);
+    await sendAndConfirmTransactionFactory({
+      rpc,
+      rpcSubscriptions,
+    })(signedTransaction, { commitment: "confirmed" });
     const asset = await fetchDigitalAsset(rpc, gift.data.nftMint);
 
     console.log("NFT created successfully!");
     console.log("Mint address:", gift.data.nftMint);
-    console.log("Signature:", sx);
+    // console.log("Signature for claiming GIFT:", sx);
+
     console.log("Name:", asset.metadata.name);
     console.log("URI:", asset.metadata.uri);
 
@@ -281,14 +414,14 @@ export default function Page() {
       // for explicitness and forward compatibility. Many APIs include required information in the body.
       // Industry convention: Always send a JSON payload if your HTTP method is POST.
       const response = await fetch(
-        `/api/v1/users/${privyWallet.address}/gifts/${gift_pda}`,
+        `/api/v1/users/${address(wallet.address)}/gifts/${gift_pda}`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            recipient: privyWallet.address,
+            recipient: address(wallet.address),
             gift_pda: gift_pda,
           }),
         }
@@ -311,40 +444,49 @@ export default function Page() {
 
   function handleClaimGift(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!(connectedToEmbeddedWallet || connectedToExternalWallet)) {
+      setIsModalOpen(true);
+      return;
+    }
     const answer = e.target.answer.value;
-
     claimGift(answer);
   }
+  const [incorrectPhone, setIncorrectPhone] = useState(true);
 
-  useEffect(() => {
+  async function handleDecryptQuestion(phone: string) {
     if (phone.length === 10) {
-      decryptQuestion(cipher, gift.data.salt, phone)
-        .then((res) => {
-          setDecrypted(res);
-        })
-        .catch((err) => {
-          console.error("Error decrypting security question", err);
-        });
+      try {
+        const res = await decryptQuestion(cipher, gift.data.salt, phone);
+        setDecrypted(res);
+        setIncorrectPhone(false);
+      } catch (error) {
+        setIncorrectPhone(true);
+        console.log(error);
+      }
     }
+  }
+  useEffect(() => {
+    handleDecryptQuestion(phone);
   }, [phone]);
+
   return (
     <main
-      className={`${spaceMono.className} antialiased bg-sky-300 min-h-screen py-20 px-10 text-black`}
+      className={`antialiased bg-sky-50 min-h-screen py-20 px-10 text-black`}
     >
       <form
         onSubmit={handleClaimGift}
-        className="max-w-[650px] my-20 mx-auto flex flex-col gap-15 "
+        className="w-[650px] mx-auto gap-10 flex flex-col items-center"
       >
-        <div className="w-full flex flex-col gap-2.5 rounded-[35px] p-10 bg-white border-[6px] border-black shadow-[-5px_5px_0_0_rgba(0,0,0)]">
-          <fieldset className="mb-[15px] flex w-full flex-col justify-start">
+        <div className="bg-white flex flex-col gap-4 rounded-[44px] p-12 w-full">
+          <fieldset className="flex w-full flex-col justify-start">
             <label
-              className="mb-2.5 block text-[13px] leading-none text-violet12"
+              className="mb-2.5 block text-neutral-500 text-sm leading-none text-violet12"
               htmlFor="phone"
             >
               Phone
             </label>
             <input
-              className="h-[35px] shrink-0 grow rounded px-2.5 text-[15px] leading-none text-violet11 shadow-[0_0_0_1px] shadow-violet7 outline-none focus:shadow-[0_0_0_2px] focus:shadow-violet8"
+              className="rounded-full shrink-0 grow border-none py-2.5 text-sm px-3 leading-none text-violet11 shadow-[0_0_0_1px] shadow-neutral-300 outline-none focus:shadow-[0_0_0_1.5px] focus:shadow-violet8"
               id="phone"
               type="text"
               value={phone}
@@ -355,15 +497,15 @@ export default function Page() {
           </fieldset>
 
           {decrypted && (
-            <fieldset className="mb-[15px] flex w-full flex-col justify-start">
+            <fieldset className="flex w-full flex-col justify-start">
               <label
-                className="mb-2.5 block text-[13px] leading-none text-violet12"
+                className="mb-2.5 block text-neutral-500 text-sm leading-none text-violet12"
                 htmlFor="answer"
               >
-                Security Answer
+                {decrypted}
               </label>
               <input
-                className="h-[35px] shrink-0 grow rounded-lg p-2.5 text-[15px] leading-none text-violet11 shadow-[0_0_0_1px] shadow-violet7 outline-none focus:shadow-[0_0_0_2px] focus:shadow-violet8"
+                className="rounded-full shrink-0 grow border-none py-2.5 text-sm px-3 leading-none text-violet11 shadow-[0_0_0_1px] shadow-neutral-300 outline-none focus:shadow-[0_0_0_1.5px] focus:shadow-violet8"
                 id="answer"
                 type="text"
                 onChange={handleSetSecurityAnswer}
@@ -377,13 +519,24 @@ export default function Page() {
 
         <button
           type="submit"
-          className="relative z-2 font-extrabold text-2xl text-black rounded-xl py-4 px-8 bg-amber-300 border-[6px] border-black shadow-[-5px_5px_0_0_rgba(0,0,0)] cursor-pointer transition-all duration-200
-          hover:shadow-[-10px_10px_0_0_rgba(0,0,0)]
-          hover:translate-x-1 hover:-translate-y-1"
+          disabled={incorrectPhone}
+          className="inline-flex disabled:cursor-not-allowed bg-teal-300 hover:bg-teal-200 hover:scale-[102%] duration-500 py-4 w-full text-2xl items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive active:scale-[0.98] cursor-pointer"
         >
           CLAIM!
         </button>
       </form>
+      <WalletModal
+        open={isModalOpen}
+        onOpenChange={(open) => {
+          setIsModalOpen(open);
+          // Clear WalletConnect URI when modal closes
+          if (!open) {
+            clearWalletConnectUri();
+          }
+        }}
+        walletConnectUri={walletConnectUri}
+        onClearWalletConnectUri={clearWalletConnectUri}
+      />
     </main>
   );
 }

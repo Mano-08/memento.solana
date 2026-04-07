@@ -36,6 +36,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { motion } from "motion/react";
+import { truncate } from "../lib/utils";
+import { usePrivy } from "@privy-io/react-auth";
 
 interface WalletDropdownContentProps {
   selectedAccount: string;
@@ -144,7 +146,17 @@ export function WalletDropdownContent({
   const [view, setView] = useState<DropdownView>("wallet");
   const [copied, setCopied] = useState(false);
 
-  const shortAddress = `${selectedAccount.slice(0, 4)}...${selectedAccount.slice(-4)}`;
+  const { logout } = usePrivy();
+
+  function handleDisconnect(disconnect: () => Promise<void>) {
+    if (walletName === "Privy") {
+      logout();
+    } else {
+      disconnect();
+    }
+  }
+
+  const shortAddress = truncate(selectedAccount); //`${selectedAccount.slice(0, 4)}...${selectedAccount.slice(-4)}`;
 
   async function handleCopy() {
     if (!navigator.clipboard) {
@@ -438,7 +450,9 @@ export function WalletDropdownContent({
             <Button
               variant="default"
               className="w-full h-11 text-base rounded-[12px]"
-              onClick={disconnect}
+              onClick={() => {
+                handleDisconnect(disconnect);
+              }}
               disabled={disconnecting}
             >
               <LogOut className="h-4 w-4 mr-2" />

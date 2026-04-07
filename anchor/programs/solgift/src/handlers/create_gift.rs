@@ -15,7 +15,8 @@ pub struct GiftCreated {
     gift: Pubkey,
     sender: Pubkey,
     authorized_claimer: Pubkey,
-    created_on: u64,
+    created_on: i64,
+    idx: u16
 }
 
 #[derive(Accounts)]
@@ -23,7 +24,9 @@ pub struct CreateGift<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
     #[account(
-        mut,
+        init_if_needed,
+        payer = signer,
+        space = 8 + User::LEN,
         seeds = [&SEED_USER_ACCOUNT, signer.key().as_ref()],
         bump
     )]
@@ -52,15 +55,11 @@ pub struct CreateGift<'info> {
     pub token_program: Interface<'info, TokenInterface>,
 }
 
-pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 32], sol_amount: u64, delivery_date: u64, authorized_claimer: Pubkey) -> Result<()> {
+pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 32], sol_amount: u64, delivery_date: i64, authorized_claimer: Pubkey) -> Result<()> {
     require!(sol_amount >= 1_000_000, GiftError::BelowMinimumAmount);
     require!(
         authorized_claimer != Pubkey::default(),
         GiftError::InvalidReceiver
-    );
-    require!(
-        delivery_date > ctx.accounts.gift.created_on,
-        GiftError::DeliveryDateMustBeInFuture
     );
     require!(
         authorized_claimer != ctx.accounts.signer.key(),
@@ -84,8 +83,12 @@ pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 3
     );
     let gift = &mut ctx.accounts.gift;
     let user = &mut ctx.accounts.user;
-    gift.created_on = Clock::get()?.unix_timestamp as u64;
-    require!(gift.created_on < delivery_date, GiftError::CannotGiftToPast);
+    gift.created_on = Clock::get()?.unix_timestamp as i64;
+    const TIMEZONE_BUFFER: i64 = 86400;
+    require!(
+        delivery_date >= (gift.created_on - TIMEZONE_BUFFER),
+        GiftError::CannotGiftToPast
+    );
     gift.answer_hash = answer_hash;
     gift.salt = salt;
     gift.nft_mint = ctx.accounts.nft_mint.key();
@@ -102,8 +105,8 @@ pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 3
     let cpi_context = CpiContext::new(
         ctx.accounts.system_program.to_account_info(),
         system_program::Transfer {
-            from: ctx.accounts.signer.to_account_info(),
-            to: gift.to_account_info(),
+            from: ctx.accounts.signer.to_account_info().clone(),
+            to: gift.to_account_info().clone(),
         },
     );
     
@@ -114,6 +117,7 @@ pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 3
         sender: ctx.accounts.signer.key(),
         authorized_claimer,
         created_on: gift.created_on,
+       idx: gift.index
     });
 
     Ok(())

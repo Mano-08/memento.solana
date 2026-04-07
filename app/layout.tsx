@@ -1,14 +1,19 @@
 import type { Metadata } from "next";
-import "./globals.css";
 import { Providers } from "@/app/providers";
-import { Space_Mono } from "next/font/google";
-import "@radix-ui/themes/styles.css";
 import AppNav from "./components/appnav";
 import Footer from "./components/footer";
+import { inter } from "./fonts/fonts";
+import "@radix-ui/themes/styles.css";
+import "./globals.css";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+import { Toaster } from "@/components/ui/sonner";
+
+const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "SolGift",
-  description: "Gift Solana NFT to your friends",
+  description: "Gift Time Locked Solana NFT!",
   icons: {
     icon: "/icon.svg",
     shortcut: "/icon.svg",
@@ -16,24 +21,19 @@ export const metadata: Metadata = {
   },
 };
 
-const spaceMono = Space_Mono({
-  subsets: ["vietnamese"],
-  weight: ["400", "700"],
-});
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${spaceMono.className} antialiased`}>
+    <html lang="en" className={cn("font-sans", geist.variable)}>
+      <body className={`${inter.className} antialiased relative`}>
         <Providers>
           <AppNav />
           {children}
-          <Footer />
         </Providers>
+        <Toaster />
       </body>
     </html>
   );

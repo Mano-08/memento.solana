@@ -1,12 +1,20 @@
 "use client";
 
 import {
+  useCluster,
   useConnector,
+  useConnectorClient,
   type WalletConnectorId,
   type WalletConnectorMetadata,
 } from "@solana/connector/react";
 import { HiddenWalletIcons } from "@/app/components/hidden-wallet-icons";
-import { useConnectOrCreateWallet, usePrivy } from "@privy-io/react-auth";
+import {
+  useConnectOrCreateWallet,
+  usePrivy,
+  useSignMessage,
+} from "@privy-io/react-auth";
+import { Connection } from "@solana/web3.js";
+const STATEMENT = "I accept the Terms of Service at https://example.com/tos";
 
 import {
   Dialog,
@@ -34,11 +42,28 @@ import {
   //IconQuestionmark,
   IconXmark,
 } from "symbols-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Spinner } from "@/app/components/ui/spinner";
-import { CustomQRCode } from "@/app/components/ui/custom-qr-code";
-import { useWallets } from "@privy-io/react-auth/solana";
+import { CustomQRCode } from "@/app/components/custom-qr-code";
 import { PRIVY_WALLET_CONNECTOR_ID } from "../helper/constants";
+import { createClient } from "../lib/supabase/client";
+import { useWallets } from "@privy-io/react-auth/solana";
+import { useWallet, useWalletActions } from "@solana/react-hooks";
+import {
+  createKitSignersFromWallet,
+  createSignableMessage,
+  SignatureBytes,
+} from "@solana/connector/headless";
+import { address, Address } from "@solana/kit";
+import {
+  useSelectedWalletAccount,
+  useWalletAccountMessageSigner,
+} from "@solana/react";
+import {
+  signIntoSupabase,
+  signIntoSupabaseWithPrivy,
+  signOutofSupabase,
+} from "../lib/supabase/auth";
 
 interface WalletModalProps {
   open: boolean;
@@ -62,10 +87,9 @@ export function WalletModal({
     connectors,
     connectWallet,
     disconnectWallet,
+    account,
   } = useConnector();
   const status = walletStatus.status;
-
-  const [wallet, setWallet] = useState<null | any>(null);
 
   const [connectingConnectorId, setConnectingConnectorId] =
     useState<WalletConnectorId | null>(null);
@@ -76,10 +100,34 @@ export function WalletModal({
 
   const { connectOrCreateWallet } = useConnectOrCreateWallet();
 
+  const { signMessage } = useSignMessage({
+    onSuccess: ({ signature }) => {
+      console.log(signature);
+      // Any logic you'd like to execute after a user successfully signs a message
+    },
+    onError: (error) => {
+      console.log(error);
+      // Any logic you'd like to execute after a user exits the message signing flow or there is an error
+    },
+  });
+
+  // const { wallets } = useWallets();
+
+  function signMessagePrivy(
+    message: Uint8Array,
+    encoding?: string
+  ): Promise<Uint8Array> {
+    const usedEncoding = encoding ?? "utf8";
+    return signMessage({
+      message: new TextDecoder(usedEncoding).decode(message),
+    }).then((signatureResult) =>
+      new TextEncoder().encode(signatureResult.signature)
+    );
+  }
+
   useEffect(() => {
     setIsClient(true);
   }, []);
-
   useEffect(() => {
     const recent = localStorage.getItem("recentlyConnectedConnectorId");
     if (recent) {
@@ -93,6 +141,9 @@ export function WalletModal({
     localStorage.setItem("recentlyConnectedConnectorId", connectorId);
     setRecentlyConnectedConnectorId(connectorId);
   }, [status, connectorId]);
+  const supabase = createClient();
+
+  const { wallets } = useWallets();
 
   const walletConnectConnector =
     connectors.find((c) => c.name === "WalletConnect") ?? null;
@@ -108,22 +159,9 @@ export function WalletModal({
     setConnectingConnectorId(null);
     // Important: reset connector state even if connectWallet() is still in-flight
     // (disconnectWallet() also cancels pending connection attempts in the connector)
+    signOutofSupabase({ supabase });
     disconnectWallet().catch(() => {});
   }
-
-  const { user } = usePrivy();
-
-  console.log(user, "PRIVY USER usePrivy()");
-
-  // Filter for wallet accounts from all linked accounts
-  const linkedWallets = user?.linkedAccounts.filter(
-    (account) => account.type === "wallet" || account.type === "smart_wallet"
-  );
-
-  // Access wallet addresses
-  linkedWallets?.forEach((wallet) => {
-    console.log(wallet.address);
-  });
 
   function handleOpenChange(nextOpen: boolean) {
     if (
@@ -142,16 +180,24 @@ export function WalletModal({
         // Ensure stale URIs don't flash
         onClearWalletConnectUri?.();
       }
-      console.log("connector.id", connector.id, connector);
       if (connector.id === PRIVY_WALLET_CONNECTOR_ID) {
         connectOrCreateWallet();
+        // const wallet = wallets.find((w) => w.standardWallet?.name === "Privy");
+        // if (!wallet) {
+        //   throw new Error("No privy wallet");
+        // }
+        // await signIntoSupabaseWithPrivy({
+        //   user: null,
+        //   wallet,
+        //   supabase,
+        // });
       } else {
         await connectWallet(connector.id);
+        // await signIntoSupabase({ account: null, supabase });
       }
       localStorage.setItem("recentlyConnectedConnectorId", connector.id);
       setRecentlyConnectedConnectorId(connector.id);
       // Don't close modal for WalletConnect - wait for connection
-      console.log(connector, "HERE JRE");
       if (connector.name !== "WalletConnect") {
         onOpenChange(false);
       }
@@ -194,7 +240,7 @@ export function WalletModal({
 
   const privyConnector = {
     id: "privy-embedded" as WalletConnectorId,
-    name: "Email Wallet",
+    name: "Privy",
     icon: "/icon.svg",
     ready: true,
     features: [],
@@ -506,7 +552,7 @@ export function WalletModal({
                   </>
                 )}
 
-                {connectors.length === 0 && (
+                {/* {connectors.length === 0 && (
                   <div className="rounded-lg border border-dashed p-8 text-center">
                     <Wallet className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
                     <h3 className="font-semibold mb-2">No Wallets Detected</h3>
@@ -532,7 +578,7 @@ export function WalletModal({
                       </Button>
                     </div>
                   </div>
-                )}
+                )} */}
               </>
             )}
           </div>
