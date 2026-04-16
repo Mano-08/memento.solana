@@ -6,12 +6,16 @@ import Image from "next/image";
 import solgiftLogo from "@/public/solgiftLogo.png";
 import { usePathname } from "next/navigation";
 import { ArrowLeft, X } from "lucide-react";
+import { usePrivy } from "@privy-io/react-auth";
+import { useConnector } from "@solana/connector/react";
+import React from "react";
+import { Button } from "./ui/button";
 
 export default function AppNav() {
   const pathname = usePathname();
 
   let isCreate = pathname === "/create" || pathname.startsWith("/create-gift");
-  let isClaim = pathname === "/claim";
+  let isClaim = pathname.startsWith("/claim");
   let isRoot = pathname === "/";
 
   // Set icon, text, and container class
@@ -20,12 +24,32 @@ export default function AppNav() {
     BrandIcon = <X className="text-neutral-500 hover:text-black" size={20} />;
     brandLabel = "Create Gift";
   } else if (isClaim) {
-    BrandIcon = <X />;
+    BrandIcon = <X className="text-neutral-500 hover:text-black" />;
     brandLabel = "Claim gift";
   } else {
     BrandIcon = null;
     brandLabel = "SolGift";
   }
+
+  const { ready, user, authenticated } = usePrivy();
+  const {
+    isConnected,
+    account,
+    connector,
+    walletConnectUri,
+    clearWalletConnectUri,
+  } = useConnector();
+
+  const [userConnected, setUserConnected] = React.useState<boolean>(false);
+
+  const connectedToExternalWallet = isConnected && account && connector;
+  const connectedToEmbeddedWallet = ready && user && authenticated;
+
+  React.useEffect(() => {
+    if (connectedToExternalWallet || connectedToEmbeddedWallet) {
+      setUserConnected(true);
+    }
+  }, [connectedToExternalWallet, connectedToEmbeddedWallet]);
 
   return (
     <header className="w-full sticky h-14 z-50 top-0">
@@ -33,17 +57,14 @@ export default function AppNav() {
       <div
         className={`relative -mt-14 flex flex-row items-center ${isRoot ? "max-w-7xl" : "px-10"} justify-between mx-auto text-black w-full h-14`}
       >
-        <Link
-          href="/"
-          className="flex flex-row items-center gap-2 cursor-pointer"
-        >
-          <div className="">
+        <div className="flex flex-row items-center gap-2">
+          <Link href="/">
             {BrandIcon ? (
               BrandIcon
             ) : (
               <Image src={solgiftLogo} alt="Logo" height={24} width={24} />
             )}
-          </div>
+          </Link>
           <div
             className={
               !isRoot ? "h-8 mt-1 mx-3.5 w-px bg-neutral-200" : "hidden"
@@ -54,12 +75,16 @@ export default function AppNav() {
           >
             {brandLabel}
           </h1>
-        </Link>
+        </div>
         <div className="flex flex-row items-center gap-3">
           <ConnectButton />
-          {/* <Button className="bg-blue-600 hover:bg-blue-600/90 text-white">
-            Gift now!
-          </Button> */}
+          {userConnected && (
+            <Link href="/dashboard">
+              <button className="font-semibold text-gray-900 hover:text-gray-900 my-2 pl-3 pr-2 py-1.5 hover:bg-slate-500/5 rounded-md">
+                Profile
+              </button>
+            </Link>
+          )}
         </div>
       </div>
     </header>

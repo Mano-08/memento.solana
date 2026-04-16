@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-solgift = "8UbHcmNUq5zRnYbdcjSPxqDdFAi6X58UsXgizstHZUbk"
+solgift = "Eb7kAScrjEpmxRmvSScSisev4VRWam7GserKaUTa12zq"
 
 [registry]
 url = "https://api.apr.dev"

@@ -26,7 +26,7 @@ import {
 } from "../instructions";
 
 export const SOLGIFT_PROGRAM_ADDRESS =
-  "8UbHcmNUq5zRnYbdcjSPxqDdFAi6X58UsXgizstHZUbk" as Address<"8UbHcmNUq5zRnYbdcjSPxqDdFAi6X58UsXgizstHZUbk">;
+  "Eb7kAScrjEpmxRmvSScSisev4VRWam7GserKaUTa12zq" as Address<"Eb7kAScrjEpmxRmvSScSisev4VRWam7GserKaUTa12zq">;
 
 export enum SolgiftAccount {
   Gift,
@@ -113,7 +113,7 @@ export function identifySolgiftInstruction(
 }
 
 export type ParsedSolgiftInstruction<
-  TProgram extends string = "8UbHcmNUq5zRnYbdcjSPxqDdFAi6X58UsXgizstHZUbk",
+  TProgram extends string = "Eb7kAScrjEpmxRmvSScSisev4VRWam7GserKaUTa12zq",
 > =
   | ({
       instructionType: SolgiftInstruction.CancelGift;

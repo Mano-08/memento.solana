@@ -1,7 +1,5 @@
 "use client";
 
-import { ConnectButton } from "@/app/components/connect-button";
-
 import "@radix-ui/themes/styles.css";
 import { toast } from "sonner";
 
@@ -29,20 +27,16 @@ const steps: Steps = {
 
 import { createClient } from "@/app/lib/supabase/client";
 import {
-  createAndMint,
-  createNft,
   fetchDigitalAsset,
   findMetadataPda,
   getCreateMetadataAccountV3Instruction,
-  TokenStandard,
 } from "@metaplex-foundation/mpl-token-metadata-kit";
 import {
+  address,
   compileTransaction,
   createKeyPairSignerFromPrivateKeyBytes,
   getBase64EncodedWireTransaction,
   getBase64Encoder,
-  isFullySignedTransaction,
-  KeyPairSigner,
   setTransactionMessageFeePayerSigner,
   signAndSendTransactionMessageWithSigners,
 } from "@solana/kit";
@@ -75,7 +69,10 @@ import {
 } from "@solana-program/system";
 import { RECURSIVE_HASH_DEPTH } from "@/app/helper/constants";
 import idl from "@/solgift.json";
-import { getCreateGiftInstruction } from "@/app/generated/solgift";
+import {
+  getCreateGiftInstruction,
+  SOLGIFT_PROGRAM_ADDRESS,
+} from "@/app/generated/solgift";
 import { encryptQuestion, recursiveSha256 } from "@/app/helper/compute";
 import {
   assertProgramsDeployed,
@@ -85,6 +82,10 @@ import {
 import { LAMPORTS_PER_SOL, TOKEN_PROGRAM_ADDRESS } from "@solana/client";
 import { u16ToLeBytes, getToday } from "@/app/helper/compute";
 import { UiWalletAccount, useWallets } from "@wallet-standard/react";
+import {
+  ConnectedStandardSolanaWallet,
+  useWallets as privyUseWallets,
+} from "@privy-io/react-auth/solana";
 import { useConnector } from "@solana/connector/react";
 import {
   getSetAuthorityInstruction,
@@ -115,15 +116,15 @@ import HCaptcha from "@hcaptcha/react-hcaptcha";
 // import Link from "next/link"; ← will use <a> instead to get full control of hash behavior!
 import { Button } from "../components/ui/button";
 import { IconWarninglight } from "symbols-react";
-import { validateDeliveryDate } from "../lib/utils";
+import { createPrivySigner, validateDeliveryDate } from "../lib/utils";
 import { usePrivy } from "@privy-io/react-auth";
 import { WalletModal } from "../components/wallet-modal";
+import Link from "next/link";
 
 const rpc = createSolanaRpc("https://api.devnet.solana.com");
 const rpcSubscriptions = createSolanaRpcSubscriptions(
   "ws://api.devnet.solana.com"
 );
-const SOLGIFT_PROGRAM_ADDRESS: Address = idl.address as Address;
 
 type CreateGiftData = {
   name: string;
@@ -135,21 +136,30 @@ type CreateGiftData = {
 };
 
 export default function CreateGiftForm() {
+  const { ready, user, authenticated } = usePrivy();
+  const {
+    isConnected,
+    account,
+    connector,
+    walletConnectUri,
+    clearWalletConnectUri,
+  } = useConnector();
   const formattedDate = getToday();
-  const { account } = useConnector(); // gives you the address string
   const uiWallets = useWallets(); // gives you branded UiWalletAccount objects
-
+  const { wallets } = privyUseWallets();
+  const wallet = wallets.find((w) => w.standardWallet?.name === "Privy");
   // Cross-reference by address to get the branded UiWalletAccount
   const uiWalletAccount =
     uiWallets.flatMap((w) => w.accounts).find((a) => a.address === account) ??
     null;
+
   const [createGiftData, setCreateGiftData] = useState<CreateGiftData>({
     name: "Kef",
     giftAmount: 0.001,
     birthday: formattedDate,
-    email: "1231231231",
-    securityQuestion: "1",
-    securityAnswer: "q",
+    email: "mark@gmail.com",
+    securityQuestion: "our favorite band name",
+    securityAnswer: "linkinpark",
   });
 
   const [imageFile, setImageFile] = useState<null | File>(null);
@@ -191,8 +201,8 @@ export default function CreateGiftForm() {
     }));
   }
 
-  function handleSetRecipientPhone(e: React.ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value.replace(/[^0-9]/g, "");
+  function handleSetRecipientEmail(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value;
     setCreateGiftData((prev) => {
       return { ...prev, email: value };
     });
@@ -228,14 +238,19 @@ export default function CreateGiftForm() {
       String(createGiftData.giftAmount).length > 0 &&
       String(createGiftData.name).trim().length > 0;
 
-    // Check for Step 2 completion
+    // Check for Step 2 completion (now includes email validation)
+    function validateEmail(email: string): boolean {
+      // Very basic email regex for simple validation
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+    }
     const step2Completed =
       !!createGiftData.securityQuestion &&
       !!createGiftData.securityAnswer &&
       !!createGiftData.email &&
       String(createGiftData.securityQuestion).trim().length > 0 &&
       String(createGiftData.securityAnswer).trim().length > 0 &&
-      String(createGiftData.email).trim().length > 0;
+      String(createGiftData.email).trim().length > 0 &&
+      validateEmail(createGiftData.email);
 
     setStatus((prev) => ({
       ...prev,
@@ -317,6 +332,9 @@ export default function CreateGiftForm() {
       </a>
     );
   }
+
+  const connectedToExternalWallet = isConnected && account && connector;
+  const connectedToEmbeddedWallet = ready && user && authenticated;
 
   return (
     <main
@@ -469,8 +487,8 @@ export default function CreateGiftForm() {
               id="email"
               type="text"
               value={createGiftData.email}
-              onChange={handleSetRecipientPhone}
-              placeholder="alabama@sweet.home"
+              onChange={handleSetRecipientEmail}
+              placeholder="mark@gmail.com"
               name="email"
             />
           </fieldset>
@@ -489,7 +507,7 @@ export default function CreateGiftForm() {
               value={createGiftData.securityQuestion}
               onChange={handleSetSecurityQuestion}
               name="question"
-              placeholder="Which city did we first meet in?"
+              placeholder="Our favorite band name?"
             />
           </fieldset>
 
@@ -507,7 +525,7 @@ export default function CreateGiftForm() {
               onChange={handleSetSecurityAnswer}
               value={createGiftData.securityAnswer}
               name="answer"
-              placeholder="santacruz"
+              placeholder="linkinpark"
             />
           </fieldset>
         </div>
@@ -523,31 +541,24 @@ export default function CreateGiftForm() {
                 giftAmount={createGiftData.giftAmount}
               />
 
-              {uiWalletAccount !== null ? (
-                <SendGift
+              {connectedToExternalWallet && uiWalletAccount !== null ? (
+                <SendGiftWithExternalWallet
                   uiWalletAccount={uiWalletAccount}
                   imageFile={imageFile}
                   createGiftData={createGiftData}
                 />
+              ) : connectedToEmbeddedWallet && wallet !== undefined ? (
+                <SendGiftWithEmbeddedWallet
+                  wallet={wallet}
+                  imageFile={imageFile}
+                  createGiftData={createGiftData}
+                />
               ) : (
-                <div className="w-[400px] flex flex-col mt-5 gap-3 border border-yellow-300 rounded-xl p-4">
-                  <p className="text-yellow-700 text-center text-sm mb-2 flex items-center justify-center gap-2">
-                    <TriangleAlert size={16} />
-                    Connect your wallet to continue
-                  </p>
-
-                  <Button
-                    variant={"default"}
-                    onClick={toggleOpenWalletModal}
-                    className="bg-purple-600 hover:bg-purple-600/90 text-white"
-                  >
-                    Connect Wallet
-                  </Button>
-                </div>
+                <Modal open={uiWalletAccount === null} />
               )}
             </div>
           ) : (
-            <button> upload iamge wallet da kdn</button>
+            <p>Uplaod Image</p>
           )}
         </div>
       </form>
@@ -555,21 +566,64 @@ export default function CreateGiftForm() {
   );
 }
 
-type SendGiftProps = {
+type ModalProps = {
+  open: boolean;
+};
+
+function Modal({ open }: ModalProps) {
+  return <p>pclaim</p>;
+}
+
+type SendGiftWithExternalWalletProps = {
   uiWalletAccount: UiWalletAccount;
   imageFile: File;
   createGiftData: CreateGiftData;
 };
-function SendGift({
+function SendGiftWithExternalWallet({
   uiWalletAccount,
   imageFile,
   createGiftData,
-}: SendGiftProps) {
+}: SendGiftWithExternalWalletProps) {
   const signer = useWalletAccountTransactionSendingSigner(
     uiWalletAccount,
     "solana:devnet"
   );
 
+  return (
+    <SendGift
+      signer={signer}
+      imageFile={imageFile}
+      createGiftData={createGiftData}
+    />
+  );
+}
+
+type SendGiftWithEmbeddedWalletProps = {
+  wallet: ConnectedStandardSolanaWallet;
+  imageFile: File;
+  createGiftData: CreateGiftData;
+};
+function SendGiftWithEmbeddedWallet({
+  wallet,
+  imageFile,
+  createGiftData,
+}: SendGiftWithEmbeddedWalletProps) {
+  const signer = createPrivySigner(wallet);
+  return (
+    <SendGift
+      signer={signer}
+      imageFile={imageFile}
+      createGiftData={createGiftData}
+    />
+  );
+}
+
+type SendGiftProps = {
+  signer: TransactionSigner<string>;
+  imageFile: File;
+  createGiftData: CreateGiftData;
+};
+function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
   const encoder = new TextEncoder();
   const handleCreateGift = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -764,6 +818,8 @@ function SendGift({
         console.log("userAccount exists:", !!userAccount?.value);
         console.log("count:", count);
 
+        // ---- Ensure we're minting a true NFT (non-fungible token) following Solana Metaplex standard ----
+        // 1. Derive PDA for the NFT gift account
         const [giftPda] = await getProgramDerivedAddress({
           programAddress: SOLGIFT_PROGRAM_ADDRESS,
           seeds: [
@@ -772,8 +828,6 @@ function SendGift({
             u16ToLeBytes(count),
           ],
         });
-
-        console.log("U16 oidx", u16ToLeBytes(count));
 
         const [giftNftAta] = await findAssociatedTokenPda({
           mint: nftMint.address,
@@ -788,7 +842,8 @@ function SendGift({
         console.log("Authorized claimer", authorizedClaimer);
 
         const [metadataPda] = await findMetadataPda({ mint: nftMint.address });
-        console.log("NFT METADATA", metadataPda);
+
+        // Create mint account for NFT (mint has 0 decimals, 1 supply, non-fungible!)
         const mintSize = getMintSize();
         const mintRent = await rpc
           .getMinimumBalanceForRentExemption(BigInt(mintSize))
@@ -800,15 +855,16 @@ function SendGift({
           space: BigInt(mintSize),
           programAddress: TOKEN_PROGRAM_ADDRESS,
         });
-        // 2. Initialize mint — signer is mint + freeze authority
+
+        // Initialize mint - decimals: 0, mint and freeze authority = signer (required for NFT)
         const initMintIx = getInitializeMintInstruction({
           mint: nftMint.address,
-          decimals: 0,
+          decimals: 0, // this is required for NFT (non-fungible)
           mintAuthority: signer.address,
           freezeAuthority: signer.address,
         });
 
-        // 3. Create gift PDA's ATA
+        // Create Associated Token Account for the gift PDA to hold the NFT
         const createAtaIx = await getCreateAssociatedTokenInstructionAsync({
           payer: signer,
           ata: giftNftAta,
@@ -816,7 +872,7 @@ function SendGift({
           mint: nftMint.address,
         });
 
-        // 4. Mint exactly 1 token into gift PDA's ATA
+        // Mint exactly 1 token into the gift PDA's ATA (supply = 1 means NFT)
         const mintToIx = getMintToInstruction({
           mint: nftMint.address,
           token: giftNftAta,
@@ -824,7 +880,7 @@ function SendGift({
           amount: 1n,
         });
 
-        // 5. Attach Metaplex metadata — signer still owns mint authority here ✅
+        // Attach Metaplex metadata, making this a certified NFT per standard, using URI, symbol, creators, etc.
         const createMetadataIx = getCreateMetadataAccountV3Instruction({
           metadata: metadataPda,
           mint: nftMint.address,
@@ -835,8 +891,8 @@ function SendGift({
             name: nftName as string,
             symbol: "GIFT",
             uri: `https://sapphire-tremendous-mackerel-441.mypinata.cloud/ipfs/${metadataCid}`,
-            sellerFeeBasisPoints: 0,
-            creators: null,
+            sellerFeeBasisPoints: 0, // no royalties
+            creators: null, // or provide an array with creators if you want
             collection: null,
             uses: null,
           },
@@ -844,7 +900,7 @@ function SendGift({
           collectionDetails: null,
         });
 
-        // 6. Revoke mint authority — signer still owns it ✅
+        // Revoke mint authority so no more tokens can ever be minted for this NFT.
         const revokeMintIx = getSetAuthorityInstruction({
           owned: nftMint.address,
           owner: signer,
@@ -852,13 +908,29 @@ function SendGift({
           newAuthority: null,
         });
 
-        // 7. Revoke freeze authority — signer still owns it ✅
+        // Revoke freeze authority so mint can't be frozen/unfrozen anymore.
         const revokeFreezeIx = getSetAuthorityInstruction({
           owned: nftMint.address,
           owner: signer,
           authorityType: AuthorityType.FreezeAccount,
           newAuthority: null,
         });
+
+        // -----------
+        // The combination of:
+        // - 0 decimals,
+        // - max supply 1,
+        // - Metaplex metadata (Token Metadata Program with URI & name),
+        // makes this a true NFT.
+        // To ensure this appears as an NFT and not just a "Token," make sure the Metaplex metadata is successfully created and attached to the mint account using the Token Metadata Program.
+        // This is done by sending a `createMetadataIx` instruction that includes the NFT's name, symbol, URI, and other relevant fields.
+        // After your transaction, you can verify the NFT by checking the metadata account on Solscan or any Solana explorer.
+        // If the NFT still shows up only as a generic token in wallets like Phantom, double-check that:
+        //   1. The URI is correct and serves proper JSON metadata.
+        //   2. The metadata account address matches the mint.
+        //   3. Wallets have refreshed their metadata cache (sometimes delays happen).
+        // The recipient should receive this as an NFT in wallets that support NFTs (like Phantom).
+        // -----------
         const minRent = await rpc
           .getMinimumBalanceForRentExemption(BigInt(0)) // 0 bytes = plain wallet
           .send();
@@ -1097,7 +1169,7 @@ function SendGift({
         type="submit"
         variant={"default"}
         onClick={handleCreateGift}
-        className="text-white w-full bg-purple-600 hover:bg-purple-500 h-12 group overflow-hidden relative"
+        className="text-white w-full rounded-full bg-purple-600 hover:bg-purple-500 h-12 group overflow-hidden relative"
       >
         <span
           className="

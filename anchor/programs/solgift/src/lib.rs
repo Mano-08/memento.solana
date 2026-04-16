@@ -6,7 +6,7 @@ pub mod state;
 use anchor_lang::prelude::*;
 use handlers::*;
 
-declare_id!("8UbHcmNUq5zRnYbdcjSPxqDdFAi6X58UsXgizstHZUbk");
+declare_id!("Eb7kAScrjEpmxRmvSScSisev4VRWam7GserKaUTa12zq");
 
 #[program]
 pub mod solgift {
