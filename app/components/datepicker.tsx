@@ -32,7 +32,7 @@ export function DatePicker({ birthday, setBirthday }: DatePickerProps) {
         <Button
           variant="outline"
           data-empty={!birthday}
-          className="w-[212px] justify-between rounded-full text-left font-normal data-[empty=true]:text-muted-foreground"
+          className="w-[150px] justify-between rounded-md bg-transparent border-none outline-none shadow-none hover:bg-white/10 hover:text-neutral-300 text-left font-semibold text-neutral-300"
         >
           {birthday ? format(birthday, "PPP") : <span>Pick a date</span>}
           <ChevronDownIcon />

@@ -24,11 +24,15 @@ pub struct ClaimGift<'info> {
         mut, 
         seeds = [&SEED_GIFT_ACCOUNT, &gift.sender.key().as_ref(), &gift.index.to_le_bytes()],
         bump = gift.bump,
-        has_one = nft_mint @ ClaimError::IncorrectNFTMint,
         constraint = gift.claimed == false @ ClaimError::ClaimedAlready,
         constraint = gift.authorized_claimer == authorized_claimer.key() @ ClaimError::UnauthorizedClaimer
     )]
     pub gift: Account<'info, Gift>,
+    #[account(
+        constraint = nft_mint.supply == 1               @ GiftError::NotAnNFT,
+        constraint = nft_mint.mint_authority.is_none()  @ GiftError::MintAuthorityNotRevoked,
+        constraint = nft_mint.decimals == 0             @ GiftError::NotAnNFT,
+    )]
     pub nft_mint: InterfaceAccount<'info, Mint>,
     #[account(
         mut,
@@ -50,7 +54,7 @@ pub struct ClaimGift<'info> {
     pub token_program: Interface<'info, TokenInterface>,
 }
 
-pub fn claim_gift(ctx: Context<ClaimGift>, answer_hash: [u8; 32]) -> Result<()> {
+pub fn claim_gift(ctx: Context<ClaimGift>, answer_hash_n_1: [u8; 32]) -> Result<()> {
     let gift = &mut ctx.accounts.gift;
     let current_time = Clock::get()?.unix_timestamp;
 
@@ -61,7 +65,7 @@ pub fn claim_gift(ctx: Context<ClaimGift>, answer_hash: [u8; 32]) -> Result<()> 
     );
 
     // Hash the provided answer and compare it with the stored answer_hash
-    let claimed_answer_hash: [u8; 32] = hash(&answer_hash).to_bytes();    
+    let claimed_answer_hash: [u8; 32] = hash(&answer_hash_n_1).to_bytes();    
     require!(
         claimed_answer_hash == gift.answer_hash, 
         ClaimError::InvalidAnswer
@@ -109,8 +113,8 @@ pub fn claim_gift(ctx: Context<ClaimGift>, answer_hash: [u8; 32]) -> Result<()> 
 
     // Mark gift as claimed and store claim time
     gift.claimed = true;
-    gift.claimed_on = Some(current_time);
-    gift.asset_recipient = Some(*ctx.accounts.asset_recipient.key);
+    gift.claimed_on = current_time;
+    gift.asset_recipient = *ctx.accounts.asset_recipient.key;
     
     // Emit the GiftClaimed event
     emit!(GiftClaimed {

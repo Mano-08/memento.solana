@@ -18,44 +18,97 @@ export default function Home() {
   return (
     <>
       <main className="min-h-screen flex flex-col items-center">
-        <section className="min-h-[70vh] w-full bg-linear-to-b from-purple-100 to-white flex items-center justify-center">
-          <div className="max-w-7xl w-full mx-auto ">
-            <div className="flex flex-col justify-center items-center">
-              <h1 className={`text-6xl text-left ${bricolage.className}`}>
-                <span className="block animate-slideUp">
-                  Gift NFTs with time lock
+        <section className="min-h-screen bg-custom-landing w-full flex items-center justify-center">
+          <div className="flex-col md:flex-row flex items-center justify-center max-w-5xl w-full gap-20">
+            <div className="flex flex-col justify-center items-start">
+              <h1 className={`text-7xl text-left ${bricolage.className}`}>
+                <span className="block animate-slideUp text-white">
+                  Thoughtful <br /> gifts <br />
+                  <span className="text-colored">start here.</span>
                 </span>
               </h1>
               <div
-                className={`text-lg mt-2 delay-200! animate-slideUp text-black/50 max-w-2xl text-center font-medium`}
+                className={`text-lg mt-2 delay-200! animate-slideUp text-white/50 max-w-2xl text-left font-medium`}
               >
-                Whether you're celebrating a birthday or planning a surprise,
-                our platform lets you gift moments locked on-chain untill the
-                right moment.
+                Send an NFT, set the unlock date, and surprise someone special.
+                Make moments memorable on-chain.
               </div>
 
               <div className="flex flex-col items-center gap-4 max-w-[300px] mt-8">
                 <div className="delay-400! animate-slideUp">
                   <Link
-                    href="/create-gift"
-                    className=" hover:bg-purple-600/90 bg-purple-600 px-[100px] text-white py-2 text-2xl items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark"
+                    href="/create"
+                    className=" hover:bg-white/90 bg-white px-[100px] text-black py-2 text-2xl items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark"
                   >
                     Gift now!
                   </Link>
                 </div>
-                <p className="inline-flex gap-2 group text-sm delay-600! animate-slideUp text-black">
+                <p className="inline-flex gap-2 group text-sm delay-600! animate-slideUp text-white/80">
                   <span>powered by</span>
                   <Image
                     src={solanaLogoMark}
                     alt="solana logo mark"
+                    className="opacity-80"
                     height={10}
                   />
                   <Image
                     src={solanaWordMark}
                     alt="solana logo mark"
+                    className="opacity-80"
                     height={10}
                   />
                 </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center justify-center">
+              <div className="relative flex flex-row items-center w-[400px] h-[400px] group">
+                {/* Aurora Image (top card) */}
+                <div className="absolute -top-7" style={{ perspective: 1200 }}>
+                  <div
+                    className="
+                      bg-white rounded-xl shadow-xl border w-[400px] border-gray-300 p-2
+                      transition-transform duration-500
+                      hover:scale-110 rotate-8 group-hover:-rotate-8 max-w-[450px]
+                      [box-shadow:0_8px_32px_rgba(0,0,0,0.16),0_2px_8px_rgba(0,0,0,0.08)]
+                      origin-70%_80%
+                      group-hover:-translate-y-7
+                      group-hover:-translate-x-64
+                     
+                    "
+                  >
+                    <Image
+                      src={auroraImage}
+                      alt="trekking with my sister the summer of 2025"
+                      className="rounded-md block object-cover w-full h-[400px]"
+                    />
+                    <div className="mt-5 mb-2 px-1 text-center text-xs font-mono text-gray-600">
+                      Winter 2009 • Lua and Aurora
+                    </div>
+                  </div>
+                </div>
+
+                <div className="absolute top-7" style={{ perspective: 1200 }}>
+                  <div
+                    className="
+                      bg-neutral-50 rounded-xl shadow-xl border w-[400px] border-gray-300 p-2
+                      transition-transform duration-500
+                      hover:scale-110 -rotate-6 group-hover:rotate-6 max-w-[450px]
+                      [box-shadow:0_8px_32px_rgba(0,0,0,0.16),0_2px_8px_rgba(0,0,0,0.08)]
+                      origin-70%_80%
+                      group-hover:translate-y-8
+                    "
+                  >
+                    <Image
+                      src={helpingHandImage}
+                      alt="trekking with my sister the summer of 2025"
+                      className="rounded-md block object-cover w-full h-[400px]"
+                    />
+                    <div className="mt-5 mb-2 px-1 text-center text-xs font-mono text-gray-600">
+                      Summer 2012 • Fun times in San Francisco
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -75,37 +128,8 @@ export default function Home() {
         </section>
 
         {/* Images come here */}
-        {/* <section className="bg-white w-full flex flex-col items-center justify-center min-h-screen py-20">
-      <div className="relative flex flex-row items-center">
-        <div className="absolute top-0" style={{ perspective: 1200 }}>
-          <div className="bg-white rounded-xl shadow-xl border w-[300px] border-gray-300 p-2 transition-transform duration-300 hover:scale-110 rotate-8 hover:rotate-3 max-w-[350px] [box-shadow:0_8px_32px_rgba(0,0,0,0.16),0_2px_8px_rgba(0,0,0,0.08)] origin-70%_80%">
-            <Image
-              src={auroraImage}
-              alt="trekking with my sister the summer of 2025"
-              className="rounded-md block object-cover w-full h-[260px]"
-            />
-            <div className="mt-5 mb-2 px-1 text-center text-xs font-mono text-gray-600">
-              Winter 2009 • Lua and Aurora
-            </div>
-          </div>
-        </div>
 
-        <div className="absolute top-0" style={{ perspective: 1200 }}>
-          <div className="bg-neutral-50 rounded-xl shadow-xl border w-[300px] border-gray-300 p-2 transition-transform duration-300 hover:scale-110 -rotate-6 hover:-rotate-2 max-w-[350px] [box-shadow:0_8px_32px_rgba(0,0,0,0.16),0_2px_8px_rgba(0,0,0,0.08)] origin-70%_80%">
-            <Image
-              src={helpingHandImage}
-              alt="trekking with my sister the summer of 2025"
-              className="rounded-md block object-cover w-full h-[260px]"
-            />
-            <div className="mt-5 mb-2 px-1 text-center text-xs font-mono text-gray-600">
-              Summer 2012 • Fun times in San Francisco
-            </div>
-          </div>
-        </div>
-      </div>
-    </section> */}
-
-        <section className="bg-white w-full flex flex-col items-center py-20">
+        <section className=" w-full flex flex-col items-center py-20">
           <div className="flex flex-row md:gap-8 gap-2">
             <div className="text-black/50 md:text-left text-center">
               <h3 className="text-4xl text-black font-extrabold">

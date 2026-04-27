@@ -151,7 +151,7 @@ export function ConnectButton({ className }: ConnectButtonProps) {
     <>
       <button
         onClick={() => setIsModalOpen(true)}
-        className="font-semibold text-gray-900 hover:text-gray-900 my-2 pl-3 pr-2 py-1.5 hover:bg-slate-500/5 rounded-md"
+        className="font-semibold cursor-pointer text-white/50 hover:text-black/90 hover:bg-white/60 my-2 px-3 py-1 text-sm rounded-full"
       >
         {buttonContent}
       </button>

@@ -211,22 +211,26 @@ export default function Page() {
         RECURSIVE_HASH_DEPTH - 1
       );
 
-      // const answerHash_n_2 = await recursiveSha256(
-      //   combined,
-      //   RECURSIVE_HASH_DEPTH - 2
-      // );
+      const answerHash_n_2 = await recursiveSha256(
+        combined,
+        RECURSIVE_HASH_DEPTH - 2
+      );
 
-      // const concatenatedHash = new Uint8Array(
-      //   answerHash_n_1.length + answerHash_n_2.length
-      // );
-      // concatenatedHash.set(answerHash_n_1, 0);
-      // concatenatedHash.set(answerHash_n_2, answerHash_n_1.length);
+      const concatenatedHash = new Uint8Array(
+        answerHash_n_1.length + answerHash_n_2.length
+      );
+      concatenatedHash.set(answerHash_n_1, 0);
+      concatenatedHash.set(answerHash_n_2, answerHash_n_1.length);
 
-      // const nftMintseed = new Uint8Array(
-      //   await crypto.subtle.digest("SHA-256", concatenatedHash)
-      // );
+      const nftMintseed = new Uint8Array(
+        await crypto.subtle.digest("SHA-256", concatenatedHash)
+      );
 
-      const nftMint = gift.data.nftMint;
+      const nftMint = (
+        await createKeyPairSignerFromPrivateKeyBytes(nftMintseed)
+      ).address;
+      // const nftMint = gift.data.nftMint;
+
       console.log(nftMint);
       // await createKeyPairSignerFromPrivateKeyBytes(nftMintseed);
 
@@ -268,7 +272,7 @@ export default function Page() {
           nftMint: nftMint,
           giftNftAta: giftNftAta,
           assetRecipientNftAta: assetRecipientNftAta,
-          answerHash: answerHash_n_1,
+          answerHash: answerHash_n_2,
         },
         "CLAIM GIFT INFOR"
       );
@@ -279,7 +283,7 @@ export default function Page() {
         nftMint: nftMint,
         giftNftAta: giftNftAta,
         assetRecipientNftAta: assetRecipientNftAta,
-        answerHash: answerHash_n_1,
+        answerHashN1: answerHash_n_1,
       });
 
       console.log("NFT MINT ADDRSEE", nftMint);

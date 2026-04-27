@@ -58,6 +58,7 @@ export type CreateGiftInstruction<
   TAccountUser extends string | AccountMeta<string> = string,
   TAccountGift extends string | AccountMeta<string> = string,
   TAccountNftMint extends string | AccountMeta<string> = string,
+  TAccountGiftNftAta extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
   TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
@@ -82,6 +83,9 @@ export type CreateGiftInstruction<
       TAccountNftMint extends string
         ? ReadonlyAccount<TAccountNftMint>
         : TAccountNftMint,
+      TAccountGiftNftAta extends string
+        ? WritableAccount<TAccountGiftNftAta>
+        : TAccountGiftNftAta,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
@@ -152,6 +156,7 @@ export type CreateGiftAsyncInput<
   TAccountUser extends string = string,
   TAccountGift extends string = string,
   TAccountNftMint extends string = string,
+  TAccountGiftNftAta extends string = string,
   TAccountSystemProgram extends string = string,
   TAccountAssociatedTokenProgram extends string = string,
   TAccountTokenProgram extends string = string,
@@ -160,6 +165,7 @@ export type CreateGiftAsyncInput<
   user?: Address<TAccountUser>;
   gift: Address<TAccountGift>;
   nftMint: Address<TAccountNftMint>;
+  giftNftAta?: Address<TAccountGiftNftAta>;
   systemProgram?: Address<TAccountSystemProgram>;
   associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
   tokenProgram?: Address<TAccountTokenProgram>;
@@ -175,6 +181,7 @@ export async function getCreateGiftInstructionAsync<
   TAccountUser extends string,
   TAccountGift extends string,
   TAccountNftMint extends string,
+  TAccountGiftNftAta extends string,
   TAccountSystemProgram extends string,
   TAccountAssociatedTokenProgram extends string,
   TAccountTokenProgram extends string,
@@ -185,6 +192,7 @@ export async function getCreateGiftInstructionAsync<
     TAccountUser,
     TAccountGift,
     TAccountNftMint,
+    TAccountGiftNftAta,
     TAccountSystemProgram,
     TAccountAssociatedTokenProgram,
     TAccountTokenProgram
@@ -197,6 +205,7 @@ export async function getCreateGiftInstructionAsync<
     TAccountUser,
     TAccountGift,
     TAccountNftMint,
+    TAccountGiftNftAta,
     TAccountSystemProgram,
     TAccountAssociatedTokenProgram,
     TAccountTokenProgram
@@ -211,6 +220,7 @@ export async function getCreateGiftInstructionAsync<
     user: { value: input.user ?? null, isWritable: true },
     gift: { value: input.gift ?? null, isWritable: true },
     nftMint: { value: input.nftMint ?? null, isWritable: false },
+    giftNftAta: { value: input.giftNftAta ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     associatedTokenProgram: {
       value: input.associatedTokenProgram ?? null,
@@ -236,6 +246,23 @@ export async function getCreateGiftInstructionAsync<
       ],
     });
   }
+  if (!accounts.giftNftAta.value) {
+    accounts.giftNftAta.value = await getProgramDerivedAddress({
+      programAddress:
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
+      seeds: [
+        getAddressEncoder().encode(expectAddress(accounts.gift.value)),
+        getBytesEncoder().encode(
+          new Uint8Array([
+            6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235,
+            121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133,
+            126, 255, 0, 169,
+          ]),
+        ),
+        getAddressEncoder().encode(expectAddress(accounts.nftMint.value)),
+      ],
+    });
+  }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
@@ -256,6 +283,7 @@ export async function getCreateGiftInstructionAsync<
       getAccountMeta(accounts.user),
       getAccountMeta(accounts.gift),
       getAccountMeta(accounts.nftMint),
+      getAccountMeta(accounts.giftNftAta),
       getAccountMeta(accounts.systemProgram),
       getAccountMeta(accounts.associatedTokenProgram),
       getAccountMeta(accounts.tokenProgram),
@@ -270,6 +298,7 @@ export async function getCreateGiftInstructionAsync<
     TAccountUser,
     TAccountGift,
     TAccountNftMint,
+    TAccountGiftNftAta,
     TAccountSystemProgram,
     TAccountAssociatedTokenProgram,
     TAccountTokenProgram
@@ -281,6 +310,7 @@ export type CreateGiftInput<
   TAccountUser extends string = string,
   TAccountGift extends string = string,
   TAccountNftMint extends string = string,
+  TAccountGiftNftAta extends string = string,
   TAccountSystemProgram extends string = string,
   TAccountAssociatedTokenProgram extends string = string,
   TAccountTokenProgram extends string = string,
@@ -289,6 +319,7 @@ export type CreateGiftInput<
   user: Address<TAccountUser>;
   gift: Address<TAccountGift>;
   nftMint: Address<TAccountNftMint>;
+  giftNftAta: Address<TAccountGiftNftAta>;
   systemProgram?: Address<TAccountSystemProgram>;
   associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
   tokenProgram?: Address<TAccountTokenProgram>;
@@ -304,6 +335,7 @@ export function getCreateGiftInstruction<
   TAccountUser extends string,
   TAccountGift extends string,
   TAccountNftMint extends string,
+  TAccountGiftNftAta extends string,
   TAccountSystemProgram extends string,
   TAccountAssociatedTokenProgram extends string,
   TAccountTokenProgram extends string,
@@ -314,6 +346,7 @@ export function getCreateGiftInstruction<
     TAccountUser,
     TAccountGift,
     TAccountNftMint,
+    TAccountGiftNftAta,
     TAccountSystemProgram,
     TAccountAssociatedTokenProgram,
     TAccountTokenProgram
@@ -325,6 +358,7 @@ export function getCreateGiftInstruction<
   TAccountUser,
   TAccountGift,
   TAccountNftMint,
+  TAccountGiftNftAta,
   TAccountSystemProgram,
   TAccountAssociatedTokenProgram,
   TAccountTokenProgram
@@ -338,6 +372,7 @@ export function getCreateGiftInstruction<
     user: { value: input.user ?? null, isWritable: true },
     gift: { value: input.gift ?? null, isWritable: true },
     nftMint: { value: input.nftMint ?? null, isWritable: false },
+    giftNftAta: { value: input.giftNftAta ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     associatedTokenProgram: {
       value: input.associatedTokenProgram ?? null,
@@ -374,6 +409,7 @@ export function getCreateGiftInstruction<
       getAccountMeta(accounts.user),
       getAccountMeta(accounts.gift),
       getAccountMeta(accounts.nftMint),
+      getAccountMeta(accounts.giftNftAta),
       getAccountMeta(accounts.systemProgram),
       getAccountMeta(accounts.associatedTokenProgram),
       getAccountMeta(accounts.tokenProgram),
@@ -388,6 +424,7 @@ export function getCreateGiftInstruction<
     TAccountUser,
     TAccountGift,
     TAccountNftMint,
+    TAccountGiftNftAta,
     TAccountSystemProgram,
     TAccountAssociatedTokenProgram,
     TAccountTokenProgram
@@ -404,9 +441,10 @@ export type ParsedCreateGiftInstruction<
     user: TAccountMetas[1];
     gift: TAccountMetas[2];
     nftMint: TAccountMetas[3];
-    systemProgram: TAccountMetas[4];
-    associatedTokenProgram: TAccountMetas[5];
-    tokenProgram: TAccountMetas[6];
+    giftNftAta: TAccountMetas[4];
+    systemProgram: TAccountMetas[5];
+    associatedTokenProgram: TAccountMetas[6];
+    tokenProgram: TAccountMetas[7];
   };
   data: CreateGiftInstructionData;
 };
@@ -419,7 +457,7 @@ export function parseCreateGiftInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCreateGiftInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 7) {
+  if (instruction.accounts.length < 8) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -436,6 +474,7 @@ export function parseCreateGiftInstruction<
       user: getNextAccount(),
       gift: getNextAccount(),
       nftMint: getNextAccount(),
+      giftNftAta: getNextAccount(),
       systemProgram: getNextAccount(),
       associatedTokenProgram: getNextAccount(),
       tokenProgram: getNextAccount(),

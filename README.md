@@ -121,7 +121,7 @@ solana-test-validator --bpf-program metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s 
 
 DEADLINES:
 
-[] build create-gift UI for Demo
+[] build UI for Demo
 [] build claim-gift UI for Demo
 [] change DB schema
 

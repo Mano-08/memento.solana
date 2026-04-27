@@ -16,8 +16,8 @@ pub mod solgift {
         handlers::create_gift::create_gift(ctx, salt, answer_hash, sol_amount, delivery_date, authorized_claimer)
     }
     
-    pub fn claim_gift(ctx: Context<ClaimGift>, answer_hash: [u8; 32]) -> Result<()> {
-        handlers::claim_gift::claim_gift(ctx, answer_hash)
+    pub fn claim_gift(ctx: Context<ClaimGift>, answer_hash_n_1: [u8; 32]) -> Result<()> {
+        handlers::claim_gift::claim_gift(ctx, answer_hash_n_1)
     }
 
     pub fn cancel_gift(ctx: Context<CancelGift>) -> Result<()> {

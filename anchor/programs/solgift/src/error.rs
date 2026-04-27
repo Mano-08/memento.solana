@@ -35,5 +35,7 @@ pub enum GiftError {
     #[msg("NFT mint authority not revoked")]
     MintAuthorityNotRevoked,
     #[msg("Gift in locked state, will open on delivery date!")]
-    GiftNotReadyYet
+    GiftNotReadyYet,
+    #[msg("Gift PDA does not own the NFT")]
+    GiftPDADoesNotHaveNFT
 }

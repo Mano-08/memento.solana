@@ -9,6 +9,7 @@ type Steps = {
     title: string;
   };
 };
+import solanaLogoMark from "../../public/solanaLogoMark.svg";
 
 const steps: Steps = {
   step_1: {
@@ -98,16 +99,24 @@ import {
 } from "@solana-program/token";
 import {
   ArrowRight,
+  Calendar,
   Check,
   CircleAlert,
   CircleCheckBig,
   Dice1,
+  DollarSign,
   File,
   ImageDownIcon,
   ImageIcon,
   ImageUpIcon,
+  Key,
+  LockKeyhole,
+  Mail,
   MessageCircleWarning,
+  Sparkles,
   TriangleAlert,
+  Wand,
+  WandSparkles,
 } from "lucide-react";
 import Image from "next/image";
 import { DatePicker } from "@/app/components/datepicker";
@@ -120,6 +129,7 @@ import { createPrivySigner, validateDeliveryDate } from "../lib/utils";
 import { usePrivy } from "@privy-io/react-auth";
 import { WalletModal } from "../components/wallet-modal";
 import Link from "next/link";
+import { ConnectButton } from "../components/connect-button";
 
 const rpc = createSolanaRpc("https://api.devnet.solana.com");
 const rpcSubscriptions = createSolanaRpcSubscriptions(
@@ -276,11 +286,11 @@ export default function CreateGiftForm() {
     if (typeof window !== "undefined") {
       // Only execute client-side
       if (
-        window.location.pathname === "/create-gift" &&
+        window.location.pathname === "/create" &&
         !window.location.hash &&
         typeof window.location.replace === "function"
       ) {
-        window.location.replace("/create-gift#upload-image");
+        window.location.replace("/create#upload-image");
       }
     }
   }, []);
@@ -309,13 +319,13 @@ export default function CreateGiftForm() {
     return (
       // Use <a> to get full control and prevent browser hash-scroll
       <a
-        href={`/create-gift${toHash}`}
+        href={`/create${toHash}`}
         onClick={(e) => {
           e.preventDefault();
 
           // Update URL hash but do NOT scroll! Use replaceState.
           if (typeof window !== "undefined") {
-            window.history.replaceState(null, "", `/create-gift${toHash}`);
+            window.history.replaceState(null, "", `/create${toHash}`);
             setWindowHash(toHash);
           }
         }}
@@ -338,60 +348,49 @@ export default function CreateGiftForm() {
 
   return (
     <main
-      className={`antialiased bg-white w-full min-h-screen py-5 text-black`}
+      className={`antialiased bg-custom-gradient w-full min-h-screen py-20 text-black`}
     >
       <WalletModal
         open={openWalletModal}
         onOpenChange={toggleOpenWalletModal}
       />
-      <nav className="flex flex-col items-left px-5 pt-22 gap-3 fixed bg-white border-r border-solid border-black/10 top-0 z-30 py-7 h-screen w-[300px] left-0">
-        <NavStepLink
-          toHash={steps.step_1.hash}
-          windowHash={windowHash}
-          title={steps.step_1.title}
-          status={status.step_1}
-        ></NavStepLink>
-        <NavStepLink
-          toHash={steps.step_2.hash}
-          windowHash={windowHash}
-          title={steps.step_2.title}
-          status={status.step_2}
-        ></NavStepLink>
-        <NavStepLink
-          toHash={steps.step_3.hash}
-          windowHash={windowHash}
-          title={steps.step_3.title}
-          status={status.step_3}
-        ></NavStepLink>
-      </nav>
       <form
         onSubmit={(e) => e.preventDefault()}
-        className="w-[650px] mx-auto gap-10 flex flex-col items-center"
+        className="max-w-5xl mx-auto flex md:flex-row flex-col justify-center items-start"
       >
-        <div
-          className={`bg-white ${windowHash !== steps.step_1.hash && "hidden"} bg-red-300 flex flex-col gap-4 rounded-[44px] p-12 w-full pb-60`}
-        >
-          <fieldset className="flex w-full flex-col justify-start ">
-            <h1
-              className={`text-black font-bold text-2xl text-left mb-4 ${inter.className}`}
-            >
-              Upload a moment from past
-            </h1>
-            <p className="text-neutral-500 text-xs mb-4">
-              The image you upload will appear on your NFT gift and be viewable
-              to anyone with the link after the gift is revealed, so choose
-              something you'd feel comfortable sharing publicly. For example,
-              use a photo you wouldn't mind posting on Facebook.
-            </p>
-            <UploadImage imageFile={imageFile} setImageFile={setImageFile} />
-          </fieldset>
+        <div className={` flex flex-col gap-4 rounded-[44px] p-6 w-full`}>
+          <UploadImage imageFile={imageFile} setImageFile={setImageFile} />
 
-          <fieldset className="flex w-full flex-col justify-start mt-4">
+          <fieldset className="flex w-full font-semibold text-sm flex-row justify-between items-center py-3.5 bg-white/5 px-3 rounded-lg">
             <label
-              className="mb-2.5 block text-neutral-500 text-sm leading-none text-violet12"
+              className="flex flex-row items-center gap-2 text-neutral-400 leading-none"
+              htmlFor="giftAmount"
+            >
+              <Sparkles size={16} /> Modify image with AI
+            </label>
+          </fieldset>
+        </div>
+
+        <div
+          className={` flex flex-col font-bold gap-4 rounded-[44px] p-6 w-full`}
+        >
+          <fieldset className="flex w-full flex-col justify-start">
+            <input
+              className="rounded-md shrink-0 grow text-left text-5xl border-none py-2.5 leading-none text-neutral-300 outline-none"
+              id="nftName"
+              type="text"
+              name="nftName"
+              value={createGiftData.name}
+              onChange={handleSetGiftName}
+              placeholder="Happy birthday!"
+            />
+          </fieldset>
+          <fieldset className="flex w-full font-semibold text-sm flex-row justify-between items-center bg-white/5 py-1 pl-3 pr-1 rounded-lg">
+            <label
+              className="flex flex-row items-center gap-2 text-neutral-400 leading-none"
               htmlFor="birthday"
             >
-              Gift Reveal Date
+              <Calendar size={16} /> Gift Reveal Date
             </label>
             <DatePicker
               birthday={
@@ -424,66 +423,15 @@ export default function CreateGiftForm() {
               }}
             />
           </fieldset>
-
-          <fieldset className="flex w-full flex-col justify-start">
+          <fieldset className="flex w-full font-semibold text-sm flex-row justify-between items-center bg-white/5 py-1 pl-3 pr-1 rounded-lg">
             <label
-              className="mb-2.5 block text-neutral-500 text-sm leading-none text-violet12"
-              htmlFor="giftAmount"
-            >
-              Gift Amount (SOL)
-            </label>
-            <input
-              className="rounded-full shrink-0 grow border-none py-2.5 text-sm px-3 leading-none text-violet11 shadow-[0_0_0_1px] shadow-neutral-300 outline-none focus:shadow-[0_0_0_1.5px] focus:shadow-violet8"
-              id="giftAmount"
-              min={0}
-              step="any"
-              value={createGiftData.giftAmount}
-              onChange={handleSetGiftAmount}
-              type="number"
-              name="giftAmount"
-            />
-          </fieldset>
-
-          <fieldset className="flex w-full flex-col justify-start">
-            <label
-              className="mb-2.5 block text-neutral-500 text-sm leading-none text-violet12"
-              htmlFor="nftName"
-            >
-              Gift Card Text
-            </label>
-            <input
-              className="rounded-full shrink-0 grow border-none py-2.5 text-sm px-3 leading-none text-violet11 shadow-[0_0_0_1px] shadow-neutral-300 outline-none focus:shadow-[0_0_0_1.5px] focus:shadow-violet8"
-              id="nftName"
-              type="text"
-              name="nftName"
-              value={createGiftData.name}
-              onChange={handleSetGiftName}
-              placeholder="Happy birthday!"
-            />
-          </fieldset>
-        </div>
-
-        <div
-          className={`bg-white ${windowHash !== steps.step_2.hash && "hidden"} flex flex-col gap-4 rounded-[44px] p-12 w-full pb-60`}
-        >
-          <fieldset className="flex w-full flex-col justify-start">
-            <h1
-              className={`text-black font-bold text-2xl text-left mb-4 ${inter.className}`}
-            >
-              Add Security Questions
-            </h1>
-            <p className="text-neutral-500 text-xs mb-4">
-              Enter the recipient's email and a security question/answer they
-              know. They'll need the answer to claim the gift.
-            </p>
-            <label
-              className="mb-2.5 block text-neutral-500 text-sm leading-none text-violet12"
+              className="flex flex-row items-center gap-2 text-neutral-400 leading-none"
               htmlFor="email"
             >
-              Email
+              <Mail size={16} /> Recipient Email
             </label>
             <input
-              className="rounded-full shrink-0 grow border-none py-2.5 text-sm px-3 leading-none text-violet11 shadow-[0_0_0_1px] shadow-neutral-300 outline-none focus:shadow-[0_0_0_1.5px] focus:shadow-violet8"
+              className="rounded-full shrink-0 text-right grow border-none py-2.5 text-sm px-3 leading-none text-neutral-300 outline-none"
               id="email"
               type="text"
               value={createGiftData.email}
@@ -493,72 +441,85 @@ export default function CreateGiftForm() {
             />
           </fieldset>
 
-          <fieldset className="flex w-full flex-col justify-start">
+          <fieldset className="flex w-full font-semibold text-sm flex-row justify-between items-center bg-white/5 py-1 px-3 rounded-lg">
             <label
-              className="mb-2.5 block text-neutral-500 text-sm leading-none text-violet12"
-              htmlFor="question"
+              className="flex flex-row items-center gap-2 text-neutral-400 leading-none"
+              htmlFor="giftAmount"
             >
-              Security Question
+              <DollarSign size={16} /> Gift Amount
             </label>
-            <input
-              className="rounded-full shrink-0 grow border-none py-2.5 text-sm px-3 leading-none text-violet11 shadow-[0_0_0_1px] shadow-neutral-300 outline-none focus:shadow-[0_0_0_1.5px] focus:shadow-violet8"
-              id="question"
-              type="text"
-              value={createGiftData.securityQuestion}
-              onChange={handleSetSecurityQuestion}
-              name="question"
-              placeholder="Our favorite band name?"
-            />
-          </fieldset>
-
-          <fieldset className="flex w-full flex-col justify-start">
-            <label
-              className="mb-2.5 block text-neutral-500 text-sm leading-none text-violet12"
-              htmlFor="answer"
-            >
-              Security Answer
-            </label>
-            <input
-              className="rounded-full shrink-0 grow border-none py-2.5 text-sm px-3 leading-none text-violet11 shadow-[0_0_0_1px] shadow-neutral-300 outline-none focus:shadow-[0_0_0_1.5px] focus:shadow-violet8"
-              id="answer"
-              type="text"
-              onChange={handleSetSecurityAnswer}
-              value={createGiftData.securityAnswer}
-              name="answer"
-              placeholder="linkinpark"
-            />
-          </fieldset>
-        </div>
-
-        <div
-          className={`bg-white ${windowHash !== steps.step_3.hash && "hidden"} flex flex-col gap-4 rounded-[44px] p-12 w-full pb-60`}
-        >
-          {imageFile !== null ? (
-            <div className="flex flex-col items-center justify-center gap-10">
-              <NFTPreviewCard
-                imageFile={imageFile}
-                nftName={createGiftData.name}
-                giftAmount={createGiftData.giftAmount}
-              />
-
-              {connectedToExternalWallet && uiWalletAccount !== null ? (
-                <SendGiftWithExternalWallet
-                  uiWalletAccount={uiWalletAccount}
-                  imageFile={imageFile}
-                  createGiftData={createGiftData}
-                />
-              ) : connectedToEmbeddedWallet && wallet !== undefined ? (
-                <SendGiftWithEmbeddedWallet
-                  wallet={wallet}
-                  imageFile={imageFile}
-                  createGiftData={createGiftData}
-                />
-              ) : (
-                <Modal open={uiWalletAccount === null} />
-              )}
+            <div>
+              <input
+                className="rounded-md shrink-0 grow text-right border-none py-2.5 leading-none text-neutral-300 outline-none"
+                id="giftAmount"
+                min={0}
+                step="any"
+                value={createGiftData.giftAmount}
+                onChange={handleSetGiftAmount}
+                type="number"
+                name="giftAmount"
+              />{" "}
+              <span className="text-neutral-300">SOL</span>
             </div>
+          </fieldset>
+
+          <div className="flex flex-col items-start rounded-lg bg-white/5 py-1">
+            <fieldset className="flex w-full font-semibold text-sm flex-row gap-2 justify-between items-center pl-3 pr-1 rounded-lg">
+              <LockKeyhole size={16} className="text-neutral-400" />
+              <div className="border-b w-full border-black/5 border-solid flex flex-row items-center">
+                <label
+                  className="leading-none text-neutral-400"
+                  htmlFor="question"
+                >
+                  Security Question
+                </label>
+                <input
+                  id="question"
+                  className="border-solid shrink-0 text-right grow py-2.5 text-sm px-3 leading-none text-neutral-300 outline-none"
+                  type="text"
+                  value={createGiftData.securityQuestion}
+                  onChange={handleSetSecurityQuestion}
+                  name="question"
+                  placeholder="Our favorite band name?"
+                />
+              </div>
+            </fieldset>
+
+            <fieldset className="flex w-full font-semibold text-sm flex-row gap-2 justify-between items-center pl-3 pr-1 rounded-lg">
+              <Key size={16} className="text-neutral-400" />{" "}
+              <div className="w-full flex flex-row items-center">
+                <label
+                  className="leading-none text-neutral-400"
+                  htmlFor="answer"
+                >
+                  Security Answer
+                </label>
+                <input
+                  className="border-solid shrink-0 text-right grow py-2.5 text-sm px-3 leading-none text-neutral-300 outline-none"
+                  id="answer"
+                  type="text"
+                  onChange={handleSetSecurityAnswer}
+                  value={createGiftData.securityAnswer}
+                  name="answer"
+                  placeholder="linkinpark"
+                />
+              </div>
+            </fieldset>
+          </div>
+          {connectedToExternalWallet && uiWalletAccount !== null ? (
+            <SendGiftWithExternalWallet
+              uiWalletAccount={uiWalletAccount}
+              imageFile={imageFile}
+              createGiftData={createGiftData}
+            />
+          ) : connectedToEmbeddedWallet && wallet !== undefined ? (
+            <SendGiftWithEmbeddedWallet
+              wallet={wallet}
+              imageFile={imageFile}
+              createGiftData={createGiftData}
+            />
           ) : (
-            <p>Uplaod Image</p>
+            <ConnectButton />
           )}
         </div>
       </form>
@@ -566,17 +527,9 @@ export default function CreateGiftForm() {
   );
 }
 
-type ModalProps = {
-  open: boolean;
-};
-
-function Modal({ open }: ModalProps) {
-  return <p>pclaim</p>;
-}
-
 type SendGiftWithExternalWalletProps = {
   uiWalletAccount: UiWalletAccount;
-  imageFile: File;
+  imageFile: File | null;
   createGiftData: CreateGiftData;
 };
 function SendGiftWithExternalWallet({
@@ -600,7 +553,7 @@ function SendGiftWithExternalWallet({
 
 type SendGiftWithEmbeddedWalletProps = {
   wallet: ConnectedStandardSolanaWallet;
-  imageFile: File;
+  imageFile: File | null;
   createGiftData: CreateGiftData;
 };
 function SendGiftWithEmbeddedWallet({
@@ -620,7 +573,7 @@ function SendGiftWithEmbeddedWallet({
 
 type SendGiftProps = {
   signer: TransactionSigner<string>;
-  imageFile: File;
+  imageFile: File | null;
   createGiftData: CreateGiftData;
 };
 function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
@@ -628,6 +581,11 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
   const handleCreateGift = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     // HCAPTHC VERIFUCATION
+
+    if (!imageFile) {
+      toast.error("Upload image");
+      throw new Error("UPLOAD IMAGE");
+    }
 
     const nftName = createGiftData.name.trim();
     if (!nftName) throw new Error("Enter NFT Name");
@@ -661,16 +619,16 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
 
       const nftDescription = "A present!";
       const question = createGiftData.securityQuestion;
-      // let imageCid: string =
-      //   "bafkreidgjaaey4q3ergcx5cz5wv65jlc5yzcmx3ayz5ewe5afdkazjmyga"; // await uploadImageToPinata(imageFile);
-      // let metadataCid: string = await uploadMetadataToPinata({
-      //   nftName,
-      //   nftDescription,
-      //   imageCid,
-      // });
+      let imageCid: string = await uploadImageToPinata(imageFile);
+      // "bafkreidgjaaey4q3ergcx5cz5wv65jlc5yzcmx3ayz5ewe5afdkazjmyga"; // await uploadImageToPinata(imageFile);
+      const metadataCid: string = await uploadMetadataToPinata({
+        nftName,
+        nftDescription,
+        imageCid,
+      });
 
-      const metadataCid =
-        "bafkreihwdt4qma5eggireiuflt6k4h6yqgnv7pk7f4umd52rnwyrxzexuq";
+      // const metadataCid =
+      //   "bafkreihwdt4qma5eggireiuflt6k4h6yqgnv7pk7f4umd52rnwyrxzexuq";
 
       //"bafkreihwdt4qma5eggireiuflt6k4h6yqgnv7pk7f4umd52rnwyrxzexuq";
 
@@ -688,7 +646,30 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
 
         const instructions = [];
         let count: number = 0;
-        const nftMint = await generateKeyPairSigner();
+        const answerHash_n_2 = await recursiveSha256(
+          combined,
+          RECURSIVE_HASH_DEPTH - 2
+        );
+
+        const answerHash_n_1 = await recursiveSha256(
+          combined,
+          RECURSIVE_HASH_DEPTH - 1
+        );
+
+        const concatenatedHash = new Uint8Array(
+          answerHash_n_1.length + answerHash_n_2.length
+        );
+        concatenatedHash.set(answerHash_n_1, 0);
+        concatenatedHash.set(answerHash_n_2, answerHash_n_1.length);
+
+        const nftMintseed = new Uint8Array(
+          await crypto.subtle.digest("SHA-256", concatenatedHash)
+        );
+
+        const nftMint =
+          await createKeyPairSignerFromPrivateKeyBytes(nftMintseed);
+
+        // const nftMint = await generateKeyPairSigner();
         const combined_reverse = new Uint8Array([
           ...salt,
           ...encoder.encode(email),
@@ -1000,8 +981,9 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
           signer: signer,
           user: userPda,
           gift: giftPda,
-          nftMint: nftMint.address,
           salt: salt,
+          nftMint: nftMint.address,
+          giftNftAta: giftNftAta,
           answerHash: answerHash,
           solAmount: solAmount,
           deliveryDate: birthdayTimestamp,
@@ -1164,12 +1146,12 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
   };
 
   return (
-    <div className="flex flex-col w-[350px]">
+    <div className="flex flex-col w-full">
       <Button
         type="submit"
         variant={"default"}
         onClick={handleCreateGift}
-        className="text-white w-full rounded-full bg-purple-600 hover:bg-purple-500 h-12 group overflow-hidden relative"
+        className="font-semibold w-full rounded-lg bg-white hover:bg-white/90 h-12 text-black group overflow-hidden relative"
       >
         <span
           className="
@@ -1209,12 +1191,12 @@ function NFTPreviewCard({
   giftAmount: number;
 }) {
   return (
-    <div className="flex flex-col items-center bg-white rounded shadow p-3 pb-8 relative w-[350px] border border-neutral-200">
+    <div className="flex flex-col items-center bg-white rounded shadow p-3 pb-8 relative border border-neutral-200">
       <div className="aspect-6/7 bg-neutral-100 rounded-t-xs overflow-hidden w-full flex justify-center items-center border-b border-neutral-200">
         <img
           src={URL.createObjectURL(imageFile)}
           alt="NFT Preview"
-          className="object-cover object-center w-full h-full"
+          className="object-cover object-center w-[350px] h-full"
         />
       </div>
       <div className="w-full px-2 pb-1 pt-4 flex flex-row gap-2 justify-end items-center text-xs font-mono text-neutral-700">
@@ -1234,17 +1216,17 @@ function UploadImage({ imageFile, setImageFile }: UploadImageProps) {
   return (
     <>
       {imageFile ? (
-        <div className="flex justify-center items-center">
+        <div className="w-full h-[350px] flex justify-center items-center">
           <img
             src={URL.createObjectURL(imageFile)}
             alt="Preview"
-            className="rounded-md w-full object-contain shadow-sm border"
+            className="rounded-md h-full w-full object-cover shadow-sm border"
           />
         </div>
       ) : (
         <label
           htmlFor="image-upload"
-          className="flex h-[400px] w-full mx-auto flex-col justify-center items-center border-2 border-dashed border-gray-300 rounded-3xl p-8 cursor-pointer hover:border-gray-500 transition-colors duration-150 text-gray-600 bg-white"
+          className="relative flex h-[300px] w-full mx-auto justify-center items-center rounded-3xl cursor-pointer bg-custom-gradient-1 overflow-hidden transition-colors duration-150 group"
           onDragOver={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1257,8 +1239,7 @@ function UploadImage({ imageFile, setImageFile }: UploadImageProps) {
             }
           }}
         >
-          <ImageUpIcon />
-          <span className="text-sm">Click to upload or drag and drop</span>
+          {/* The upload icon is absolutely positioned at bottom right */}
           <input
             id="image-upload"
             type="file"
@@ -1270,6 +1251,11 @@ function UploadImage({ imageFile, setImageFile }: UploadImageProps) {
               }
             }}
           />
+          <div className="absolute bottom-6 right-6">
+            <span className="block transition-transform duration-200 ease-in-out group-hover:scale-105">
+              <ImageUpIcon className="h-8 w-8 text-white drop-shadow-lg" />
+            </span>
+          </div>
         </label>
       )}
     </>

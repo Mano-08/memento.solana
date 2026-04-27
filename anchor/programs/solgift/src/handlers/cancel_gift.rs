@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{
     self, BurnChecked, CloseAccount, Mint, TokenAccount, TokenInterface,
 };
+
 use anchor_spl::associated_token::AssociatedToken;
 use crate::constants::{SEED_GIFT_ACCOUNT, SEED_USER_ACCOUNT};
 use crate::error::ClaimError;
@@ -26,7 +27,6 @@ pub struct CancelGift<'info> {
         ],
         close = signer,
         bump = gift.bump,
-        has_one = nft_mint,
         has_one = sender,
         constraint = gift.claimed == false @ ClaimError::ClaimedAlready
     )]
@@ -47,6 +47,7 @@ pub struct CancelGift<'info> {
 }
 
 pub fn cancel_gift(ctx: Context<CancelGift>) -> Result<()> {
+    
     let gift = &ctx.accounts.gift;
     let mint = &ctx.accounts.nft_mint;
     let gift_nft_ata = &ctx.accounts.gift_nft_ata;

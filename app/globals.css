@@ -5,11 +5,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-a:hover,
-button:hover {
-  cursor: pointer;
-}
-
 /* Inline code styling - sand background for code wrapped in `` */
 .prose :not(pre) > code,
 .prose p code,
@@ -1027,4 +1022,39 @@ body {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
   }
+}
+.bg-custom-landing {
+  background-image: radial-gradient(
+    circle farthest-corner at 50% 52.5%,
+    rgba(14, 53, 92, 1) 0%,
+    rgba(16, 14, 72, 1) 90%
+  );
+}
+
+.text-colored {
+  -webkit-text-fill-color: transparent;
+  background: radial-gradient(
+    circle at 0 0,
+    #09f1ab 0%,
+    #63f8ee 18.82%,
+    #4f6efa 32.6%,
+    #cf58f0 52.83%,
+    #ff4ff6 68.03%,
+    #f9ff58 87.66%,
+    #bcff1f 100%
+  );
+  -webkit-background-clip: text;
+  display: inline-block;
+}
+
+.bg-custom-gradient-1 {
+  background-image: radial-gradient(
+    circle 898px at 10% 20%,
+    rgba(155, 6, 69, 1) 9.1%,
+    #bbb 90%
+  );
+}
+
+.bg-custom-gradient {
+  background: rgb(43, 38, 54);
 }

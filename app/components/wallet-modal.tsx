@@ -264,7 +264,7 @@ export function WalletModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md [&>button]:hidden rounded-[24px]">
+      <DialogContent className="sm:max-w-md [&>button]:hidden rounded-[24px] p-6">
         <DialogHeader className="flex flex-row items-center justify-between">
           {isWalletConnectFlow ? (
             <Button
