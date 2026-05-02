@@ -28,15 +28,12 @@ export enum CreateGiftStage {
   GiftCreatedSuccessfully = "gift_created_successfully", // Success stage
   Error = "error",
 }
-
-import { createClient } from "@/app/lib/supabase/client";
 import {
   fetchDigitalAsset,
   findMetadataPda,
   getCreateMetadataAccountV3Instruction,
 } from "@metaplex-foundation/mpl-token-metadata-kit";
 import {
-  address,
   compileTransaction,
   createKeyPairSignerFromPrivateKeyBytes,
   getBase64EncodedWireTransaction,
@@ -49,30 +46,27 @@ import { useWalletAccountTransactionSendingSigner } from "@solana/react";
 import {
   Address,
   appendTransactionMessageInstructions,
-  assertIsTransactionWithBlockhashLifetime,
-  createSolanaRpc,
-  createSolanaRpcSubscriptions,
   createTransactionMessage,
-  generateKeyPairSigner,
   getAddressEncoder,
   getProgramDerivedAddress,
-  getSignatureFromTransaction,
   Instruction,
   lamports,
   pipe,
-  sendAndConfirmTransactionFactory,
-  setTransactionMessageFeePayer,
   setTransactionMessageLifetimeUsingBlockhash,
-  signTransactionMessageWithSigners,
   TransactionSigner,
 } from "@solana/kit";
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   getCreateAccountInstruction,
   getTransferSolInstruction,
 } from "@solana-program/system";
 import { RECURSIVE_HASH_DEPTH } from "@/app/helper/constants";
-import idl from "@/solgift.json";
 import {
   getCreateGiftInstruction,
   SOLGIFT_PROGRAM_ADDRESS,
@@ -103,44 +97,19 @@ import {
 import {
   ArrowRight,
   Calendar,
-  Check,
-  CircleAlert,
-  CircleCheckBig,
-  Dice1,
   DollarSign,
-  File,
-  ImageDownIcon,
-  ImageIcon,
   ImageUpIcon,
   Key,
   LockKeyhole,
   Mail,
-  MessageCircleWarning,
   Sparkles,
-  TriangleAlert,
-  Wand,
-  WandSparkles,
 } from "lucide-react";
-import Image from "next/image";
 import { DatePicker } from "@/app/components/datepicker";
-import { inter, spaceMono } from "../fonts/fonts";
-import HCaptcha from "@hcaptcha/react-hcaptcha";
-// import Link from "next/link"; ← will use <a> instead to get full control of hash behavior!
 import { Button } from "../components/ui/button";
-import { IconWarninglight, IconXmark } from "symbols-react";
-import {
-  createPrivySigner,
-  createPrivyTransactionSendingSigner,
-  validateDeliveryDate,
-} from "../lib/utils";
+import { IconXmark } from "symbols-react";
+import { createPrivyTransactionSendingSigner, rpc } from "../lib/utils";
 import { usePrivy } from "@privy-io/react-auth";
-import Link from "next/link";
 import { ConnectButton } from "../components/connect-button";
-
-const rpc = createSolanaRpc("https://api.devnet.solana.com");
-const rpcSubscriptions = createSolanaRpcSubscriptions(
-  "ws://api.devnet.solana.com"
-);
 
 type CreateGiftData = {
   name: string;
@@ -159,23 +128,21 @@ enum GiftCreationStatus {
 
 export default function CreateGiftForm() {
   const { ready, user, authenticated } = usePrivy();
-
-  const {
-    isConnected,
-    account,
-    connector,
-    isConnecting,
-    clearWalletConnectUri,
-  } = useConnector();
+  const { isConnected, isConnecting, account, connector } = useConnector();
 
   const formattedDate = getToday();
-  const uiWallets = useWallets(); // gives you branded UiWalletAccount objects
+  const uiWallets = useWallets();
   const { wallets } = privyUseWallets();
-  const wallet = wallets.find((w) => w.standardWallet?.name === "Privy");
-  // Cross-reference by address to get the branded UiWalletAccount
-  const uiWalletAccount =
-    uiWallets.flatMap((w) => w.accounts).find((a) => a.address === account) ??
-    null;
+  const wallet = useCallback(
+    () => wallets.find((w) => w.standardWallet?.name === "Privy"),
+    [wallets]
+  )();
+  const uiWalletAccount = useCallback(() => {
+    return (
+      uiWallets.flatMap((w) => w.accounts).find((a) => a.address === account) ??
+      null
+    );
+  }, [uiWallets, account])();
 
   const [createGiftData, setCreateGiftData] = useState<CreateGiftData>({
     name: "Kef",
@@ -188,58 +155,81 @@ export default function CreateGiftForm() {
 
   const [imageFile, setImageFile] = useState<null | File>(null);
 
-  function handleSetGiftAmount(e: React.ChangeEvent<HTMLInputElement>) {
-    setCreateGiftData((prev) => {
-      return { ...prev, giftAmount: Number(e.target.value) };
-    });
-  }
+  const handleSetGiftAmount = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setCreateGiftData((prev) => {
+        return { ...prev, giftAmount: Number(e.target.value) };
+      });
+    },
+    []
+  );
 
-  function handleSetGiftName(e: React.ChangeEvent<HTMLInputElement>) {
-    setCreateGiftData((prev) => {
-      return { ...prev, name: e.target.value };
-    });
-  }
+  const handleSetGiftName = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setCreateGiftData((prev) => {
+        return { ...prev, name: e.target.value };
+      });
+    },
+    []
+  );
 
-  function handleSetSecurityAnswer(e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.value;
-    // Allow only English letters, ignore numbers, specials, spaces
-    // Convert to lower case, filter only a-z using charCode
-    let filtered = "";
-    for (let i = 0; i < raw.length; i++) {
-      let c = raw[i];
-      // Get char code
-      let code = c.charCodeAt(0);
-      // If upper case A-Z: 65-90, convert to lower case
-      if (code >= 65 && code <= 90) {
-        c = c.toLowerCase();
-        code = c.charCodeAt(0);
+  const handleSetSecurityAnswer = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const raw = e.target.value;
+      // Allow only English letters, ignore numbers, specials, spaces
+      // Convert to lower case, filter only a-z using charCode
+      let filtered = "";
+      for (let i = 0; i < raw.length; i++) {
+        let c = raw[i];
+        // Get char code
+        let code = c.charCodeAt(0);
+        // If upper case A-Z: 65-90, convert to lower case
+        if (code >= 65 && code <= 90) {
+          c = c.toLowerCase();
+          code = c.charCodeAt(0);
+        }
+        // Allow only lower case a-z: 97-122
+        if (code >= 97 && code <= 122) {
+          filtered += c;
+        }
       }
-      // Allow only lower case a-z: 97-122
-      if (code >= 97 && code <= 122) {
-        filtered += c;
-      }
-    }
-    setCreateGiftData((prev) => ({
-      ...prev,
-      securityAnswer: filtered,
-    }));
-  }
+      setCreateGiftData((prev) => ({
+        ...prev,
+        securityAnswer: filtered,
+      }));
+    },
+    []
+  );
 
-  function handleSetRecipientEmail(e: React.ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value;
-    setCreateGiftData((prev) => {
-      return { ...prev, email: value };
-    });
-  }
+  const handleSetRecipientEmail = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setCreateGiftData((prev) => ({
+        ...prev,
+        email: value,
+      }));
+    },
+    []
+  );
 
-  function handleSetSecurityQuestion(e: React.ChangeEvent<HTMLInputElement>) {
-    setCreateGiftData((prev) => {
-      return { ...prev, securityQuestion: e.target.value.trim() };
-    });
-  }
+  const handleSetSecurityQuestion = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setCreateGiftData((prev) => ({
+        ...prev,
+        securityQuestion: e.target.value.trim(),
+      }));
+    },
+    []
+  );
 
-  const connectedToExternalWallet = isConnected && account && connector;
-  const connectedToEmbeddedWallet = ready && user && authenticated;
+  const connectedToExternalWallet = useMemo(
+    () => !isConnecting && isConnected && account && connector,
+    [isConnecting, isConnected, account, connector]
+  );
+  const connectedToEmbeddedWallet = useMemo(
+    () => ready && user && authenticated,
+    [ready, user, authenticated]
+  );
 
   return (
     <main
@@ -475,7 +465,7 @@ type SendGiftProps = {
   createGiftData: CreateGiftData;
 };
 function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
-  const encoder = new TextEncoder();
+  const encoder = useMemo(() => new TextEncoder(), []);
   const [giftCreationStage, setGiftCreationStage] = useState<
     GiftCreationStage[]
   >([]);
@@ -485,9 +475,7 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
     // HCAPTHC VERIFUCATION
 
     if (!imageFile) {
-      toast.error("Upload Image", {
-        description: "Please upload an image to create a gift.",
-      });
+      toast.error("Upload Image");
       throw new Error("Please upload an image to create a gift.");
     }
     const nftName = createGiftData.name.trim();
@@ -746,12 +734,7 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
             rawBytes.byteLength
           );
           count = view.getUint16(8, true);
-        } else {
-          console.log("NO ACC");
         }
-
-        console.log("userAccount exists:", !!userAccount?.value);
-        console.log("count:", count);
 
         // ---- Ensure we're minting a true NFT (non-fungible token) following Solana Metaplex standard ----
         // 1. Derive PDA for the NFT gift account
@@ -769,12 +752,6 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
           owner: giftPda,
           tokenProgram: TOKEN_PROGRAM_ADDRESS,
         });
-        console.log("GIFT NFT ATA", giftNftAta);
-        console.log("GIFT PDA", giftPda);
-
-        console.log("USER PDA", userPda);
-        console.log("NFT", nftMint.address);
-        console.log("Authorized claimer", authorizedClaimer);
 
         const [metadataPda] = await findMetadataPda({
           mint: nftMint.address,
@@ -946,18 +923,18 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
           authorizedClaimer: authorizedClaimer,
         });
 
-        console.log("CREATE GIFT ALL DATA", {
-          signer: signer,
-          user: userPda,
-          gift: giftPda,
-          nftMint: nftMint.address,
-          salt: salt,
-          answerHash: answerHash,
-          solAmount: solAmount,
-          deliveryDate: birthdayTimestamp,
-          authorizedClaimer: authorizedClaimer,
-        });
-        console.log("INDEX", count);
+        // console.log("CREATE GIFT ALL DATA", {
+        //   signer: signer,
+        //   user: userPda,
+        //   gift: giftPda,
+        //   nftMint: nftMint.address,
+        //   salt: salt,
+        //   answerHash: answerHash,
+        //   solAmount: solAmount,
+        //   deliveryDate: birthdayTimestamp,
+        //   authorizedClaimer: authorizedClaimer,
+        // });
+        // console.log("INDEX", count);
 
         instructions.push(createMintAccountIx); // allocate
         instructions.push(initMintIx); // initialize mint, signer = authority
@@ -1005,18 +982,6 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
         for (let i = 0; i < maxTries; i++) {
           try {
             asset = await fetchDigitalAsset(rpc, nftMint.address);
-            console.log(
-              "[ASSET CREATION SUCCESS] after",
-              i,
-              "tries. Name:",
-              asset.metadata.name
-            );
-            console.log(
-              "[ASSET CREATION SUCCESS] after",
-              i,
-              "tries. URI:",
-              asset.metadata.uri
-            );
             // If fetchDigitalAsset succeeds, break loop
             break;
           } catch (err) {
@@ -1077,7 +1042,9 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
             await new Promise((res) => setTimeout(res, delay));
             totalWaited += delay;
             // Prevent exceeding total allowed wait
-            if (totalWaited + delay > maxTotalWait) break;
+            if (totalWaited + delay > maxTotalWait) {
+              break;
+            }
             delay *= 2;
           }
         }
@@ -1128,9 +1095,9 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
           return prev;
         });
 
-        console.log("NFT created successfully!");
-        console.log("Mint address:", nftMint.address);
-        console.log("Signature:", sx);
+        // console.log("NFT created successfully!");
+        // console.log("Mint address:", nftMint.address);
+        // console.log("Signature:", sx);
         setGiftCreationStage((prev) => {
           return [
             ...prev,
@@ -1150,30 +1117,93 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
           (typeof error?.message === "string" &&
             error.message.includes("User rejected the request."))
         ) {
+          setGiftCreationStage((prev) => {
+            const idx = prev.findIndex(
+              (s) => s.stage === CreateGiftStage.WrappingGift
+            );
+            if (idx !== -1) {
+              // Update existing UploadingImage stage
+              const updated = [...prev];
+              updated[idx] = {
+                ...updated[idx],
+                errorMessage: "User rejected the request.",
+                status: GiftCreationStatus.Error,
+              };
+              return updated;
+            }
+            // If not found, just return prev unchanged (or you may choose to push, but per instruction do not)
+            return prev;
+          });
           return;
         }
+        setGiftCreationStage((prev) => {
+          const idx = prev.findIndex(
+            (s) => s.stage === CreateGiftStage.WrappingGift
+          );
+          if (idx !== -1) {
+            // Update existing UploadingImage stage
+            const updated = [...prev];
+            updated[idx] = {
+              ...updated[idx],
+              errorMessage: String(error).includes(
+                `Error: Simulation failed: "AccountNotFound"`
+              )
+                ? "Insufficient Balance"
+                : "Failed to create gift",
+
+              status: GiftCreationStatus.Error,
+            };
+            return updated;
+          }
+          // If not found, just return prev unchanged (or you may choose to push, but per instruction do not)
+          return prev;
+        });
         console.error(error);
         toast.error("Failed to create gift");
       }
     } catch (error) {
-      alert(error + "DNFVNRO");
-      console.log(error);
+      setGiftCreationStage((prev) => {
+        const idx = prev.findIndex(
+          (s) => s.stage === CreateGiftStage.WrappingGift
+        );
+        if (idx !== -1) {
+          // Update existing UploadingImage stage
+          const updated = [...prev];
+          updated[idx] = {
+            ...updated[idx],
+            errorMessage: "Failed to Create Gift",
+            status: GiftCreationStatus.Error,
+          };
+          return updated;
+        }
+        // If not found, just return prev unchanged (or you may choose to push, but per instruction do not)
+        return prev;
+      });
+      console.log("ERROR sendAndConfirm", error);
     }
   }
 
-  function handleOpenChangeLoadingStagesModal(open: boolean) {
-    if (!open) {
-      // Only allow closing if any stage has status Error
-      const hasError = giftCreationStage.some(
-        (stage) => stage.status === GiftCreationStatus.Error
-      );
-      if (hasError) {
-        setGiftCreationStage([]);
+  const handleOpenChangeLoadingStagesModal = useCallback(
+    (open: boolean) => {
+      if (!open) {
+        // Only allow closing if any stage has status Error or gift successfully created
+        const canClose =
+          giftCreationStage.some(
+            (stage) => stage.status === GiftCreationStatus.Error
+          ) ||
+          (giftCreationStage.length > 0 &&
+            giftCreationStage[giftCreationStage.length - 1].status ===
+              GiftCreationStatus.Success &&
+            giftCreationStage[giftCreationStage.length - 1].stage ===
+              CreateGiftStage.GiftCreatedSuccessfully);
+
+        if (canClose) {
+          setGiftCreationStage([]);
+        }
       }
-      // Otherwise, do nothing (prevent closing)
-    }
-    // If open === true, let modal open naturally (do nothing)
-  }
+    },
+    [giftCreationStage]
+  );
 
   return (
     <div className="flex flex-col w-full">
@@ -1247,7 +1277,6 @@ function UploadImage({ imageFile, setImageFile }: UploadImageProps) {
             }
           }}
         >
-          {/* The upload icon is absolutely positioned at bottom right */}
           <input
             id="image-upload"
             type="file"
@@ -1328,14 +1357,14 @@ function LoadingStagesModal({
             if (isLoading) {
               // Opacity 100%, text-2xl, font-bold
               labelClasses.push(
-                "text-2xl",
+                "text-xl",
                 "opacity-100",
                 "text-black",
                 "font-bold"
               );
             } else {
               // All other: base, opacity-75, regular
-              labelClasses.push("text-base", "opacity-75", "text-black");
+              labelClasses.push("text-sm", "text-black/50");
             }
 
             const isCompleted =
@@ -1383,7 +1412,7 @@ function LoadingStagesModal({
                         : notStarted
                           ? "bg-neutral-200 border-neutral-200"
                           : isError
-                            ? "bg-red-200 border-red-200"
+                            ? "bg-red-500 border-red-500"
                             : "bg-gray-100 border-gray-100",
                     ].join(" ")}
                     style={{ minWidth: "1.25rem", minHeight: "1.25rem" }}
@@ -1404,9 +1433,9 @@ function LoadingStagesModal({
                         />
                       </svg>
                     ) : isError ? (
-                      // Red exclamation/cross
+                      // Red background, white X
                       <svg
-                        className="h-3 w-3 text-red-500"
+                        className="h-3 w-3 text-white"
                         fill="none"
                         viewBox="0 0 16 16"
                       >

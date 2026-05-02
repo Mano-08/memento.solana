@@ -2,6 +2,7 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { CreateGiftData } from "./types";
 import { DateTime } from "luxon";
+import { createSolanaRpc } from "@solana/kit";
 import {
   address,
   Address,
@@ -454,3 +455,5 @@ export function createAuthorizedRecipientSigner(
     },
   };
 }
+
+export const rpc = createSolanaRpc("https://api.devnet.solana.com");

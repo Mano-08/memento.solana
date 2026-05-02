@@ -8,7 +8,6 @@ const pinata = new PinataSDK({
 
 export async function POST(req: NextRequest) {
   try {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
     const formData = await req.formData();
     const file = formData.get("file") as File;
 
