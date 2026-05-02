@@ -60,7 +60,7 @@ import {
   useWalletAccountMessageSigner,
 } from "@solana/react";
 import {
-  signIntoSupabase,
+  // signIntoSupabase,
   signIntoSupabaseWithPrivy,
   signOutofSupabase,
 } from "../lib/supabase/auth";
@@ -143,8 +143,6 @@ export function WalletModal({
   }, [status, connectorId]);
   const supabase = createClient();
 
-  const { wallets } = useWallets();
-
   const walletConnectConnector =
     connectors.find((c) => c.name === "WalletConnect") ?? null;
   const isWalletConnectFlow =
@@ -160,6 +158,7 @@ export function WalletModal({
     // Important: reset connector state even if connectWallet() is still in-flight
     // (disconnectWallet() also cancels pending connection attempts in the connector)
     signOutofSupabase({ supabase });
+    console.log("SOB");
     disconnectWallet().catch(() => {});
   }
 
@@ -357,7 +356,9 @@ export function WalletModal({
                             key={connector.id}
                             variant="outline"
                             className="h-auto justify-between p-4 rounded-[16px]"
-                            onClick={() => handleSelectWallet(connector)}
+                            onClick={() => {
+                              handleSelectWallet(connector);
+                            }}
                             disabled={isThisConnecting}
                           >
                             <div className="flex items-center gap-3 flex-1">

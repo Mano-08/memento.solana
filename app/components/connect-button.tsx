@@ -1,6 +1,10 @@
 "use client";
 
-import { useConnector } from "@solana/connector/react";
+import {
+  useCluster,
+  useConnector,
+  useConnectorClient,
+} from "@solana/connector/react";
 import { Button } from "@/app/components/ui/button";
 import {
   DropdownMenu,
@@ -12,28 +16,50 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@/app/components/ui/avatar";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { WalletModal } from "./wallet-modal";
 import { WalletDropdownContent } from "./wallet-dropdown-content";
 import { Wallet, ChevronDown } from "lucide-react";
 import { Spinner } from "@/app/components/ui/spinner";
 import { cn, truncate } from "@/app/lib/utils";
-import { usePrivy, useSignMessage } from "@privy-io/react-auth";
+import { usePrivy } from "@privy-io/react-auth";
 import { useWallets } from "@privy-io/react-auth/solana";
 import { createClient } from "../lib/supabase/client";
 import {
-  signIntoSupabase,
+  createUserAccountIfNotExist,
   signIntoSupabaseWithPrivy,
+  signOutofSupabase,
 } from "../lib/supabase/auth";
+import { Connection } from "@solana/web3.js";
+import {
+  createKitSignersFromWallet,
+  createSignableMessage,
+} from "@solana/connector/headless";
 
 interface ConnectButtonProps {
   className?: string;
 }
 
+/**
+ * Supabase login/wallet sync logic:
+ *
+ * 1. If there's a Supabase session:
+ *    - If a wallet is connected, check the wallet matches the Supabase session's address.
+ *      - If not, sign out of Supabase.
+ *    - If no wallet, nothing more needed.
+ *    => No prompt for login.
+ *
+ * 2. If there's NO Supabase session:
+ *    - If wallet is NOT connected, do nothing (user's not ready to login). No prompt.
+ *    - If wallet IS connected, prompt user to login with wallet (show modal).
+ *
+ * This prevents forcing the user to re-auth if they're already logged in.
+ */
 export function ConnectButton({ className }: ConnectButtonProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
   const { ready, user, authenticated } = usePrivy();
   const {
     isConnected,
@@ -43,53 +69,236 @@ export function ConnectButton({ className }: ConnectButtonProps) {
     walletConnectUri,
     clearWalletConnectUri,
   } = useConnector();
-
+  const { walletStatus, connectorId } = useConnector();
+  const { cluster } = useCluster();
+  const client = useConnectorClient();
   const supabase = createClient();
-
   const { wallets } = useWallets();
 
-  async function manageSupabaseConnection() {
-    if (account) {
-      signIntoSupabase({
-        account,
-        supabase,
-      });
-    } else if (user && wallets.length) {
-      console.log(wallets);
-      const wallet = wallets.find((w) => w.standardWallet?.name === "Privy");
-      if (!wallet) {
-        throw new Error("No privy wallet");
+  const [loginPrompted, setLoginPrompted] = useState(false);
+
+  useEffect(() => {
+    if (!ready || isConnecting) return;
+    let ignore = false;
+    if (
+      !isConnecting &&
+      account &&
+      walletStatus.status === "connected" &&
+      connectorId &&
+      client?.getConnector(connectorId) &&
+      cluster
+    ) {
+      async function handleAuthWalletSync() {
+        if (ignore) return;
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        // 1. If user is logged into supabase:
+        if (session) {
+          if (account) {
+            const linkedWallet = session.user.user_metadata?.custom_claims
+              ?.address as string | undefined;
+            if (linkedWallet && account !== linkedWallet) {
+              await signOutofSupabase({ supabase });
+              console.log("SOB");
+            }
+          } else {
+            await signOutofSupabase({ supabase });
+          }
+        } else {
+          // 2. If user is not logged into supabase:
+          if (account) {
+            // Only prompt for login with wallet once unless user changes wallet
+            if (!loginPrompted) {
+              if (connectorId && walletStatus.status === "connected") {
+                const wallet = client?.getConnector(connectorId);
+                const walletAccount =
+                  walletStatus.status === "connected"
+                    ? walletStatus.session.selectedAccount.account
+                    : null;
+
+                if (wallet && walletAccount && cluster && client) {
+                  const rpcUrl = client.getRpcUrl();
+                  const connection = rpcUrl ? new Connection(rpcUrl) : null;
+                  const kitSigners = createKitSignersFromWallet(
+                    wallet,
+                    walletAccount,
+                    connection,
+                    undefined
+                  );
+                  const { error } = await supabase.auth.signInWithWeb3({
+                    chain: "solana",
+                    statement:
+                      "I accept the Terms of Service at https://example.com/tos",
+                    wallet: {
+                      publicKey: {
+                        toBase58: () => account,
+                      },
+                      signMessage: async (message: Uint8Array) => {
+                        if (!kitSigners || !kitSigners.messageSigner) {
+                          throw new Error("Wallet not ready for signing");
+                        }
+                        const signableMessage = createSignableMessage(message);
+                        const signedMessages =
+                          await kitSigners.messageSigner.modifyAndSignMessages([
+                            signableMessage,
+                          ]);
+                        const signatureMap = signedMessages[0].signatures;
+                        return signatureMap[account];
+                      },
+                    },
+                  });
+                  await createUserAccountIfNotExist({
+                    walletAddress: account,
+                    supabase,
+                  });
+                  if (error) {
+                    // Don't loop, just log error and don't reprompt unless wallet/account changes
+                    console.error("Error signing in with wallet:", error);
+                  } else {
+                    setLoginPrompted(true);
+                  }
+                }
+              }
+            }
+          } else {
+            // If no wallet is connected, don't prompt for login nor try to log the user in.
+            setLoginPrompted(false); // allow future prompt once wallet connects
+          }
+        }
       }
-      signIntoSupabaseWithPrivy({
-        supabase,
-        wallet,
-        user,
-      });
-    }
-  }
 
+      handleAuthWalletSync();
+    } else if (ready && user && wallets.length) {
+      async function handleAuthWalletSync() {
+        if (ignore) return;
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        // 1. If user is logged into supabase:
+        if (session) {
+          if (user) {
+            const linkedWallet = session.user.user_metadata?.custom_claims
+              ?.address as string | undefined;
+            if (linkedWallet && user?.wallet?.address !== linkedWallet) {
+              await signOutofSupabase({ supabase });
+              console.log("SOB");
+            }
+          } else {
+            await signOutofSupabase({ supabase });
+            console.log("SOB");
+          }
+        } else {
+          // 2. If user is not logged into supabase:
+          if (user && wallets.length) {
+            // No need for useMemo here; this runs once per effect execution after wallets/user change.
+            const privyWallet = wallets.find(
+              (w) => w.standardWallet?.name === "Privy"
+            );
+
+            if (privyWallet) {
+              await signIntoSupabaseWithPrivy({
+                supabase,
+                wallet: privyWallet,
+                user,
+              });
+              setLoginPrompted(true);
+              return;
+            }
+          } else {
+            // If no wallet is connected, don't prompt for login nor try to log the user in.
+            setLoginPrompted(false); // allow future prompt once wallet connects
+          }
+        }
+      }
+
+      handleAuthWalletSync();
+    }
+    // Reset loginPrompted if wallet/account changes
+    return () => {
+      ignore = true;
+    };
+  }, [
+    account,
+    user, // privy
+    wallets, // privy
+    walletStatus, // ext wallet
+    connectorId, // ext wallet
+    client, // ext wallet
+    cluster, // ext wallet
+    isConnecting, // ext wallet
+    ready, // privy
+  ]);
+
+  // Reset loginPrompted if wallet/account changes (new wallet connection/new session)
   useEffect(() => {
-    if (account || user) {
-      manageSupabaseConnection();
-    }
-  }, [account, user, wallets]);
+    setLoginPrompted(false);
+  }, [account, user]);
 
-  async function checkSOn() {
-    const ss = await supabase.auth.getSession();
-    console.log(ss, "CHECK SESSIONSSS");
-  }
+  const connectedToExternalWallet = useMemo(
+    () => !isConnecting && isConnected && account && connector,
+    [isConnecting, isConnected, account, connector]
+  );
+  const connectedToEmbeddedWallet = useMemo(
+    () => ready && user && authenticated,
+    [ready, user, authenticated]
+  );
+  const [protectedRoute, setProtectedRoute] = useState(false);
+  const handleOnOpenChangeWallet = useCallback(
+    (open: boolean) => {
+      if (
+        !connectedToExternalWallet &&
+        !connectedToEmbeddedWallet &&
+        isModalOpen &&
+        protectedRoute
+      ) {
+        setIsModalOpen(true);
+        return;
+      }
 
+      setIsModalOpen(open);
+      if (!open) {
+        clearWalletConnectUri();
+      }
+    },
+    [
+      connectedToExternalWallet,
+      connectedToEmbeddedWallet,
+      isModalOpen,
+      protectedRoute,
+      clearWalletConnectUri,
+      setIsModalOpen,
+    ]
+  );
   useEffect(() => {
-    if (user || account) {
-      console.log("CHECK", user, account);
-      checkSOn();
+    // Only run on client after mount, so window is defined
+    if (typeof window !== "undefined") {
+      setProtectedRoute(
+        ["/dashboard", "/create"].includes(window.location.pathname)
+      );
     }
-  }, [user, account]);
+  }, []);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname;
+      if (
+        (path === "/dashboard" || path === "/create") &&
+        !connectedToExternalWallet &&
+        !connectedToEmbeddedWallet
+      ) {
+        setIsModalOpen(true);
+      } else {
+        setIsModalOpen(false);
+      }
+    }
+  }, [connectedToEmbeddedWallet, connectedToExternalWallet]);
 
-  const connectedToExternalWallet = isConnected && account && connector;
-  const connectedToEmbeddedWallet = ready && user && authenticated;
   if (connectedToExternalWallet || connectedToEmbeddedWallet) {
-    const shortAddress = connectedToExternalWallet
+    const shortAddress = account
       ? truncate(account)
       : truncate(user?.wallet?.address || "");
     const walletIcon = connector?.icon || undefined;
@@ -113,7 +322,7 @@ export function ConnectButton({ className }: ConnectButtonProps) {
                 <Wallet className="h-3 w-3" />
               </AvatarFallback>
             </Avatar>
-            <span className="text-xs">{shortAddress}</span>
+            <span className="text-xs md:block hidden">{shortAddress}</span>
             <motion.div
               animate={{ rotate: isDropdownOpen ? -180 : 0 }}
               transition={{ duration: 0.2, ease: "easeInOut" }}
@@ -135,38 +344,32 @@ export function ConnectButton({ className }: ConnectButtonProps) {
         </DropdownMenuContent>
       </DropdownMenu>
     );
+  } else {
+    // Show loading button when connecting (but modal stays rendered)
+    const buttonContent = isConnecting ? (
+      <>
+        <Spinner className="h-4 w-4" />
+        <span className="text-xs">Connecting...</span>
+      </>
+    ) : (
+      "Connect Wallet"
+    );
+
+    return (
+      <>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="font-semibold cursor-pointer text-white/50 hover:text-black/90 hover:bg-white/60 my-2 px-3 py-1 text-sm rounded-full"
+        >
+          {buttonContent}
+        </button>
+        <WalletModal
+          open={isModalOpen}
+          onOpenChange={handleOnOpenChangeWallet}
+          walletConnectUri={walletConnectUri}
+          onClearWalletConnectUri={clearWalletConnectUri}
+        />
+      </>
+    );
   }
-
-  // Show loading button when connecting (but modal stays rendered)
-  const buttonContent = isConnecting ? (
-    <>
-      <Spinner className="h-4 w-4" />
-      <span className="text-xs">Connecting...</span>
-    </>
-  ) : (
-    "Connect Wallet"
-  );
-
-  return (
-    <>
-      <button
-        onClick={() => setIsModalOpen(true)}
-        className="font-semibold cursor-pointer text-white/50 hover:text-black/90 hover:bg-white/60 my-2 px-3 py-1 text-sm rounded-full"
-      >
-        {buttonContent}
-      </button>
-      <WalletModal
-        open={isModalOpen}
-        onOpenChange={(open) => {
-          setIsModalOpen(open);
-          // Clear WalletConnect URI when modal closes
-          if (!open) {
-            clearWalletConnectUri();
-          }
-        }}
-        walletConnectUri={walletConnectUri}
-        onClearWalletConnectUri={clearWalletConnectUri}
-      />
-    </>
-  );
 }

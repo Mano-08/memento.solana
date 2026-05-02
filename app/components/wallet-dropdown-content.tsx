@@ -38,6 +38,8 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import { truncate } from "../lib/utils";
 import { usePrivy } from "@privy-io/react-auth";
+import { signOutofSupabase } from "../lib/supabase/auth";
+import { createClient } from "../lib/supabase/client";
 
 interface WalletDropdownContentProps {
   selectedAccount: string;
@@ -148,7 +150,10 @@ export function WalletDropdownContent({
 
   const { logout } = usePrivy();
 
-  function handleDisconnect(disconnect: () => Promise<void>) {
+  async function handleDisconnect(disconnect: () => Promise<void>) {
+    const supabase = createClient();
+    await signOutofSupabase({ supabase });
+    console.log("SOB");
     if (walletName === "Privy") {
       logout();
     } else {

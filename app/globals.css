@@ -1026,8 +1026,8 @@ body {
 .bg-custom-landing {
   background-image: radial-gradient(
     circle farthest-corner at 50% 52.5%,
-    rgba(14, 53, 92, 1) 0%,
-    rgba(16, 14, 72, 1) 90%
+    rgb(31, 3, 42) 0%,
+    #020117 90%
   );
 }
 

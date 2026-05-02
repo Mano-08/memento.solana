@@ -7,7 +7,7 @@ import {
 } from "@privy-io/react-auth/solana";
 import { fetchGift, getClaimGiftInstruction } from "@/app/generated/solgift";
 import { UiWalletAccount, useWallets } from "@wallet-standard/react";
-import { ArrowRight, CrossIcon, X } from "lucide-react";
+import { ArrowRight, CrossIcon, Mail, Puzzle, X } from "lucide-react";
 import { getAddMemoInstruction } from "@solana-program/memo";
 import { decryptQuestion, recursiveSha256 } from "@/app/helper/compute";
 import { RECURSIVE_HASH_DEPTH } from "@/app/helper/constants";
@@ -74,6 +74,7 @@ import {
   useWalletAccountTransactionSendingSigner,
   useWalletAccountTransactionSigner,
 } from "@solana/react";
+import { ConnectButton } from "@/app/components/connect-button";
 // import { createPrivyPartialSigner } from "@/app/lib/utils";
 
 const rpc = createSolanaRpc("https://api.devnet.solana.com");
@@ -144,7 +145,7 @@ export default function Page() {
       : "";
   const [gift, setGift] = useState<any | null>(null);
   const [cipher, setCipher] = useState<string>("");
-  const [email, setPhone] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
   const [answer, setAnswer] = useState<string>("");
   const [decrypted, setDecrypted] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -165,13 +166,17 @@ export default function Page() {
           throw new Error("Invalid Gift ID");
         }
 
+        console.log("CHECK 1 passed");
+
         // 2. Check if gift exists onchain, if not skip backend call
         const giftData = await fetchGift(rpc, gift_pda as Address);
+        console.log("giftData, giftData", giftData, gift_pda, rpc);
         if (!giftData) {
           setClaimGiftError(ClaimGiftErrors.GIFT_DOESNT_EXIST);
           throw new Error("Gift does not exist onchain");
         }
         setGift(giftData);
+        console.log("CHECK 2 passed");
 
         // Now call backend API for metadata, etc.
         const response = await fetch(`/api/v1/gifts/${gift_pda}`, {
@@ -193,7 +198,7 @@ export default function Page() {
 
   function handleSetRecipientEmail(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
-    setPhone(value);
+    setEmail(value);
   }
 
   async function claimGift(answer: string, signer: TransactionSigner<string>) {
@@ -217,10 +222,11 @@ export default function Page() {
       );
 
       const concatenatedHash = new Uint8Array(
-        answerHash_n_1.length + answerHash_n_2.length
+        answerHash_n_1.length + answerHash_n_2.length + salt.length
       );
       concatenatedHash.set(answerHash_n_1, 0);
       concatenatedHash.set(answerHash_n_2, answerHash_n_1.length);
+      concatenatedHash.set(salt, answerHash_n_1.length + answerHash_n_2.length);
 
       const nftMintseed = new Uint8Array(
         await crypto.subtle.digest("SHA-256", concatenatedHash)
@@ -289,18 +295,6 @@ export default function Page() {
       console.log("NFT MINT ADDRSEE", nftMint);
       const instructions = [];
       instructions.push(claimGiftIx);
-
-      const { value: sol_left } = await rpc
-        .getBalance(authorizedClaimerKeypair.address)
-        .send();
-
-      const emptyAuthorizedClaimerIx = getTransferSolInstruction({
-        source: authorizedClaimerKeypair,
-        destination: gift.data.sender,
-        amount: sol_left - lamports(5000n),
-      });
-      const instructions_2: Instruction[] = [];
-      instructions_2.push(emptyAuthorizedClaimerIx);
 
       async function sendAndConfirm(options: {
         instructions: Instruction[];
@@ -441,38 +435,16 @@ export default function Page() {
         return sig;
       }
 
+      // CLAIM GIFT KA FUNC
       await sendAndConfirm({
         instructions,
         payer: payer,
       });
 
-      // Second tx: clean up SOL from authorized claimer
-      const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
-
-      const transactionMessage = pipe(
-        createTransactionMessage({ version: 0 }),
-        (tx) =>
-          setTransactionMessageFeePayerSigner(authorizedClaimerKeypair, tx),
-        (tx) =>
-          setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
-        (tx) => appendTransactionMessageInstructions(instructions_2, tx)
-      );
-
-      const signedTransaction =
-        await signTransactionMessageWithSigners(transactionMessage);
-      assertIsTransactionWithBlockhashLifetime(signedTransaction);
-      await sendAndConfirmTransactionFactory({
-        rpc,
-        rpcSubscriptions,
-      })(signedTransaction, { commitment: "confirmed" });
-
-      const asset = await fetchDigitalAsset(rpc, nftMint);
-
-      console.log("NFT created successfully!");
-      console.log("Mint address:", nftMint);
-
-      console.log("Name:", asset.metadata.name);
-      console.log("URI:", asset.metadata.uri);
+      await claimRentAuthorizedClaimer({
+        nftMint,
+        authorizedClaimerKeypair,
+      });
 
       try {
         // It is generally better practice to include a JSON body even if your backend handler uses URL params,
@@ -557,51 +529,119 @@ export default function Page() {
     setClaimGiftError(null);
   }
 
+  async function claimRentAuthorizedClaimer({
+    nftMint,
+    authorizedClaimerKeypair,
+  }: {
+    nftMint: Address<string>;
+    authorizedClaimerKeypair: KeyPairSigner;
+  }) {
+    try {
+      const { value: sol_left } = await rpc
+        .getBalance(authorizedClaimerKeypair.address)
+        .send();
+
+      // Second tx: clean up SOL from authorized claimer
+      const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+      const emptyAuthorizedClaimerIx = getTransferSolInstruction({
+        source: authorizedClaimerKeypair,
+        destination: gift.data.sender,
+        amount: sol_left - lamports(5000n),
+      });
+      const instructions_2: Instruction[] = [];
+      instructions_2.push(emptyAuthorizedClaimerIx);
+      const transactionMessage = pipe(
+        createTransactionMessage({ version: 0 }),
+        (tx) =>
+          setTransactionMessageFeePayerSigner(authorizedClaimerKeypair, tx),
+        (tx) =>
+          setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+        (tx) => appendTransactionMessageInstructions(instructions_2, tx)
+      );
+
+      const signedTransaction =
+        await signTransactionMessageWithSigners(transactionMessage);
+      assertIsTransactionWithBlockhashLifetime(signedTransaction);
+
+      console.log("HJI");
+      await sendAndConfirmTransactionFactory({
+        rpc,
+        rpcSubscriptions,
+      })(signedTransaction, { commitment: "confirmed" });
+      console.log("HJI2");
+
+      const asset = await fetchDigitalAsset(rpc, nftMint);
+
+      console.log("NFT created successfully!");
+      console.log("Mint address:", nftMint);
+
+      console.log("Name:", asset.metadata.name);
+      console.log("URI:", asset.metadata.uri);
+    } catch (error) {
+      console.log(error);
+      throw error;
+    }
+  }
+
   return (
     <main
-      className={`antialiased bg-purple-50 min-h-screen py-20 px-10 text-black`}
+      className={`antialiased bg-custom-landing min-h-screen flex items-center justify-between py-20 px-6 w-screen overflow-x-hidden`}
     >
       <Modal closeGiftErrorModal={closeGiftErrorModal} error={claimGiftError} />
-      <form className="w-[650px] mx-auto gap-10 flex flex-col items-center">
-        <div className="bg-white flex flex-col gap-4 rounded-[44px] p-12 w-full">
-          <fieldset className="flex w-full flex-col justify-start">
+      <form
+        onSubmit={(e) => e.preventDefault()}
+        className="md:max-w-xl mx-auto flex gap-6 md:w-auto w-full flex-col items-center"
+      >
+        <div
+          className={`md:min-w-[400px] flex flex-col gap-4 rounded-[44px] w-full`}
+        >
+          <fieldset className="flex w-full font-semibold text-sm flex-col gap-2 justify-between items-start bg-white p-3 rounded-lg">
             <label
-              className="mb-2.5 block text-neutral-500 text-sm leading-none text-violet12"
+              className="flex flex-row items-center gap-2 text-neutral-700 leading-none"
               htmlFor="email"
             >
-              Email
+              <Mail size={16} /> Email
             </label>
-            <input
-              className="rounded-full shrink-0 grow border-none py-2.5 text-sm px-3 leading-none text-violet11 shadow-[0_0_0_1px] shadow-neutral-300 outline-none focus:shadow-[0_0_0_1.5px] focus:shadow-violet8"
-              id="email"
-              type="email"
-              value={email}
-              onChange={handleSetRecipientEmail}
-              placeholder="mark@gmail.com"
-              name="email"
-            />
-          </fieldset>
-
-          {decrypted && (
-            <fieldset className="flex w-full flex-col justify-start">
-              <label
-                className="mb-2.5 block text-neutral-500 text-sm leading-none text-violet12"
-                htmlFor="answer"
-              >
-                {decrypted}
-              </label>
+            <div className="w-full rounded-lg bg-white">
               <input
-                className="rounded-full shrink-0 grow border-none py-2.5 text-sm px-3 leading-none text-violet11 shadow-[0_0_0_1px] shadow-neutral-300 outline-none focus:shadow-[0_0_0_1.5px] focus:shadow-violet8"
-                id="answer"
-                type="text"
-                onChange={handleSetSecurityAnswer}
-                value={answer}
-                name="answer"
-                placeholder="santacruz"
+                className="rounded-lg w-full shrink-0 text-left grow border-none text-sm py-2 leading-none text-neutral-800 outline-none bg-transparent"
+                id="email"
+                type="email"
+                value={email}
+                onChange={handleSetRecipientEmail}
+                placeholder="mark@gmail.com"
+                name="email"
               />
-            </fieldset>
-          )}
+            </div>
+          </fieldset>
         </div>
+
+        {decrypted && (
+          <div
+            className={`md:min-w-[400px] w-full flex flex-col gap-4 rounded-[44px]`}
+          >
+            <fieldset className="flex w-full font-semibold text-sm flex-col gap-2 justify-between items-start bg-white p-3 rounded-lg">
+              <label
+                className="flex flex-row items-center gap-2 text-neutral-700 leading-none"
+                htmlFor="email"
+              >
+                <Puzzle size={16} /> {decrypted}
+              </label>
+              <div className="w-full rounded-lg bg-white">
+                <input
+                  className="rounded-lg w-full shrink-0 text-left grow border-none text-sm py-2 leading-none text-neutral-800 outline-none bg-transparent"
+                  id="answer"
+                  type="text"
+                  onChange={handleSetSecurityAnswer}
+                  value={answer}
+                  name="answer"
+                  placeholder="santacruz"
+                  style={{ background: "transparent" }}
+                />
+              </div>
+            </fieldset>
+          </div>
+        )}
 
         {wallet ? (
           <ClaimGiftWithEmbeddedWallet
@@ -616,7 +656,7 @@ export default function Page() {
             incorrectEmail={incorrectEmail}
           />
         ) : (
-          <p>CONNECT WALLET zuka</p>
+          <ConnectButton className="w-[400px]" />
         )}
       </form>
       <WalletModal

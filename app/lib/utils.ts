@@ -19,6 +19,7 @@ import {
   sendAndConfirmTransactionFactory,
   setTransactionMessageFeePayer,
   setTransactionMessageLifetimeUsingBlockhash,
+  SignatureBytes,
   SignatureDictionary,
   signTransactionMessageWithSigners,
   SolanaRpcApi,
@@ -26,6 +27,7 @@ import {
   Transaction,
   TransactionPartialSigner,
   TransactionPartialSignerConfig,
+  TransactionSendingSignerConfig,
   TransactionSigner,
   TransactionWithinSizeLimit,
   TransactionWithLifetime,
@@ -228,6 +230,7 @@ export function validateDeliveryDate(deliveryDate: Date): {
 }
 
 import { getTransactionEncoder, getTransactionDecoder } from "@solana/kit";
+import { TransactionSendingSigner } from "@solana/connector";
 
 export function createPrivySigner(
   wallet: ConnectedStandardSolanaWallet
@@ -292,6 +295,78 @@ export function createPrivySigner(
               return {
                 [address(wallet.address)]: signature,
               };
+            } catch (error) {
+              console.error(
+                `[Privy-Signer] ❌ Error signing transaction ${index + 1}:`,
+                error
+              );
+              throw new Error(
+                `[Privy-Signer] Failed to sign transaction ${index + 1}: ${
+                  error instanceof Error ? error.message : String(error)
+                }`
+              );
+            }
+          })
+        );
+
+        console.log(
+          `[Privy-Signer] ✅ All ${transactions.length} transaction(s) signed successfully`
+        );
+        return results;
+      } catch (error) {
+        console.error("[Privy-Signer] ❌ Error in signTransactions:", error);
+        throw error;
+      }
+    },
+  };
+}
+
+export function createPrivyTransactionSendingSigner(
+  wallet: ConnectedStandardSolanaWallet
+): TransactionSendingSigner {
+  const walletAddress: Address = address(wallet.address);
+
+  return {
+    address: walletAddress,
+    signAndSendTransactions: async (
+      transactions: readonly (
+        | Transaction
+        | (Transaction & TransactionWithLifetime)
+      )[],
+      config?: TransactionSendingSignerConfig
+    ): Promise<readonly SignatureBytes[]> => {
+      console.log(
+        `[Privy-Signer] invoked for ${transactions.length} transaction(s)`
+      );
+
+      const encoder = getTransactionEncoder();
+      // const decoder = getTransactionDecoder();
+
+      try {
+        const results = await Promise.all(
+          transactions.map(async (tx, index) => {
+            try {
+              console.log(
+                `[Privy-Signer] Encoding transaction ${index + 1}/${transactions.length}...`
+              );
+
+              // Encode to ReadonlyUint8Array
+              const txBytes = encoder.encode(tx);
+
+              // Convert to mutable Uint8Array (Privy requirement)
+              const mutableTxBytes = new Uint8Array(txBytes);
+
+              console.log(
+                `[Privy-Signer] Signing transaction ${index + 1}/${transactions.length}...`
+              );
+
+              // Sign with Privy wallet
+              const { signature } = await wallet.signAndSendTransaction({
+                chain: "solana:devnet",
+                transaction: mutableTxBytes,
+              });
+
+              return signature as SignatureBytes;
             } catch (error) {
               console.error(
                 `[Privy-Signer] ❌ Error signing transaction ${index + 1}:`,

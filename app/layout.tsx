@@ -27,8 +27,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
-      <body className={`${inter.className} antialiased relative`}>
+    <html
+      lang="en"
+      className={`${cn("font-sans", geist.variable)} overflow-x-hidden max-w-screen`}
+    >
+      <body className={`${inter.className} antialiased relative w-screen`}>
         <Providers>
           <AppNav />
           {children}

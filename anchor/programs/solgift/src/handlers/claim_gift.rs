@@ -114,6 +114,7 @@ pub fn claim_gift(ctx: Context<ClaimGift>, answer_hash_n_1: [u8; 32]) -> Result<
     // Mark gift as claimed and store claim time
     gift.claimed = true;
     gift.claimed_on = current_time;
+    gift.nft_mint = ctx.accounts.nft_mint.key().to_bytes();
     gift.asset_recipient = *ctx.accounts.asset_recipient.key;
     
     // Emit the GiftClaimed event

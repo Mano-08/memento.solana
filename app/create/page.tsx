@@ -9,22 +9,25 @@ type Steps = {
     title: string;
   };
 };
-import solanaLogoMark from "../../public/solanaLogoMark.svg";
+enum CREATE_GIFT_ERROR {
+  FAILED_TO_UPLOAD_TO_IPFS = "failed to upload data to IPFS storage",
+}
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/app/components/ui/dialog";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 
-const steps: Steps = {
-  step_1: {
-    hash: "#upload-image",
-    title: "Upload Image",
-  },
-  step_2: {
-    hash: "#security-questions",
-    title: "Add Security Questions",
-  },
-  step_3: {
-    hash: "#wrap-gift",
-    title: "Wrap and Send",
-  },
-};
+export enum CreateGiftStage {
+  NotStarted = "not_started",
+  UploadingImage = "uploading_image", // Correct spelling
+  WrappingGift = "wrapping_gift", // Locking/wrapping the NFT as a gift
+  SavingGiftInfo = "saving_gift_information", // Saving gift details to database
+  GiftCreatedSuccessfully = "gift_created_successfully", // Success stage
+  Error = "error",
+}
 
 import { createClient } from "@/app/lib/supabase/client";
 import {
@@ -63,7 +66,7 @@ import {
   signTransactionMessageWithSigners,
   TransactionSigner,
 } from "@solana/kit";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   getCreateAccountInstruction,
   getTransferSolInstruction,
@@ -124,10 +127,13 @@ import { inter, spaceMono } from "../fonts/fonts";
 import HCaptcha from "@hcaptcha/react-hcaptcha";
 // import Link from "next/link"; ← will use <a> instead to get full control of hash behavior!
 import { Button } from "../components/ui/button";
-import { IconWarninglight } from "symbols-react";
-import { createPrivySigner, validateDeliveryDate } from "../lib/utils";
+import { IconWarninglight, IconXmark } from "symbols-react";
+import {
+  createPrivySigner,
+  createPrivyTransactionSendingSigner,
+  validateDeliveryDate,
+} from "../lib/utils";
 import { usePrivy } from "@privy-io/react-auth";
-import { WalletModal } from "../components/wallet-modal";
 import Link from "next/link";
 import { ConnectButton } from "../components/connect-button";
 
@@ -145,15 +151,23 @@ type CreateGiftData = {
   securityAnswer: string;
 };
 
+enum GiftCreationStatus {
+  Loading = "loading",
+  Success = "success",
+  Error = "error",
+}
+
 export default function CreateGiftForm() {
   const { ready, user, authenticated } = usePrivy();
+
   const {
     isConnected,
     account,
     connector,
-    walletConnectUri,
+    isConnecting,
     clearWalletConnectUri,
   } = useConnector();
+
   const formattedDate = getToday();
   const uiWallets = useWallets(); // gives you branded UiWalletAccount objects
   const { wallets } = privyUseWallets();
@@ -224,136 +238,13 @@ export default function CreateGiftForm() {
     });
   }
 
-  const [status, setStatus] = React.useState<{
-    step_1: "warning" | "completed" | "not_completed";
-    step_2: "warning" | "completed" | "not_completed";
-    step_3: "warning" | "completed" | "not_completed";
-  }>({
-    step_1: "not_completed",
-    step_2: "not_completed",
-    step_3: "not_completed",
-  });
-
-  function toggleOpenWalletModal() {
-    setOpenWalletModal((prev) => !prev);
-  }
-
-  React.useEffect(() => {
-    // Check for Step 1 completion
-    const step1Completed =
-      imageFile != null &&
-      !!createGiftData.birthday &&
-      !!createGiftData.giftAmount &&
-      !!createGiftData.name &&
-      String(createGiftData.giftAmount).length > 0 &&
-      String(createGiftData.name).trim().length > 0;
-
-    // Check for Step 2 completion (now includes email validation)
-    function validateEmail(email: string): boolean {
-      // Very basic email regex for simple validation
-      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-    }
-    const step2Completed =
-      !!createGiftData.securityQuestion &&
-      !!createGiftData.securityAnswer &&
-      !!createGiftData.email &&
-      String(createGiftData.securityQuestion).trim().length > 0 &&
-      String(createGiftData.securityAnswer).trim().length > 0 &&
-      String(createGiftData.email).trim().length > 0 &&
-      validateEmail(createGiftData.email);
-
-    setStatus((prev) => ({
-      ...prev,
-      step_1: step1Completed ? "completed" : "not_completed",
-      step_2: step2Completed ? "completed" : "not_completed",
-      // step_3 handled elsewhere after send
-    }));
-  }, [
-    imageFile,
-    createGiftData.birthday,
-    createGiftData.giftAmount,
-    createGiftData.name,
-    createGiftData.securityQuestion,
-    createGiftData.securityAnswer,
-    createGiftData.email,
-  ]);
-
-  const [windowHash, setWindowHash] = React.useState<string | undefined>(
-    undefined
-  );
-
-  React.useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Only execute client-side
-      if (
-        window.location.pathname === "/create" &&
-        !window.location.hash &&
-        typeof window.location.replace === "function"
-      ) {
-        window.location.replace("/create#upload-image");
-      }
-    }
-  }, []);
-
-  React.useEffect(() => {
-    setWindowHash(window.location.hash);
-    const onHashChange = () => setWindowHash(window.location.hash);
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
-
-  const [openWalletModal, setOpenWalletModal] = useState<boolean>(false);
-
-  // Custom NavStepLink to prevent scroll when changing only hash on same route
-  function NavStepLink({
-    toHash,
-    title,
-    status,
-    windowHash,
-  }: {
-    title: string;
-    toHash: string;
-    status: string;
-    windowHash?: string;
-  }) {
-    return (
-      // Use <a> to get full control and prevent browser hash-scroll
-      <a
-        href={`/create${toHash}`}
-        onClick={(e) => {
-          e.preventDefault();
-
-          // Update URL hash but do NOT scroll! Use replaceState.
-          if (typeof window !== "undefined") {
-            window.history.replaceState(null, "", `/create${toHash}`);
-            setWindowHash(toHash);
-          }
-        }}
-        tabIndex={0}
-        role="link"
-        className={`inline-flex items-center  bg-white justify-start gap-0.5 px-5 py-1 whitespace-nowrap rounded-xl font-semibold text-sm transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0  active:scale-[0.98] cursor-pointer text-left ${
-          windowHash === toHash ? "text-purple-600" : "text-neutral-500"
-        }`}
-      >
-        <div className="flex flex-row items-center">
-          <Count selected={windowHash === toHash} status={status} />
-        </div>
-        <span className="ml-2 flex-1">{title}</span>
-      </a>
-    );
-  }
-
   const connectedToExternalWallet = isConnected && account && connector;
   const connectedToEmbeddedWallet = ready && user && authenticated;
 
   return (
     <main
-      className={`antialiased bg-custom-gradient w-full min-h-screen py-20 text-black`}
+      className={`antialiased bg-custom-gradient w-screen overflow-x-hidden min-h-screen py-20 text-black`}
     >
-      <WalletModal
-        open={openWalletModal}
-        onOpenChange={toggleOpenWalletModal}
-      />
       <form
         onSubmit={(e) => e.preventDefault()}
         className="max-w-5xl mx-auto flex md:flex-row flex-col justify-center items-start"
@@ -561,7 +452,7 @@ function SendGiftWithEmbeddedWallet({
   imageFile,
   createGiftData,
 }: SendGiftWithEmbeddedWalletProps) {
-  const signer = createPrivySigner(wallet);
+  const signer = createPrivyTransactionSendingSigner(wallet);
   return (
     <SendGift
       signer={signer}
@@ -571,6 +462,13 @@ function SendGiftWithEmbeddedWallet({
   );
 }
 
+type GiftCreationStage = {
+  info?: string;
+  stage: CreateGiftStage;
+  status: GiftCreationStatus;
+  errorMessage: string;
+};
+
 type SendGiftProps = {
   signer: TransactionSigner<string>;
   imageFile: File | null;
@@ -578,15 +476,20 @@ type SendGiftProps = {
 };
 function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
   const encoder = new TextEncoder();
-  const handleCreateGift = async (e: React.MouseEvent<HTMLButtonElement>) => {
+  const [giftCreationStage, setGiftCreationStage] = useState<
+    GiftCreationStage[]
+  >([]);
+
+  async function handleCreateGift(e: React.MouseEvent<HTMLButtonElement>) {
     e.preventDefault();
     // HCAPTHC VERIFUCATION
 
     if (!imageFile) {
-      toast.error("Upload image");
-      throw new Error("UPLOAD IMAGE");
+      toast.error("Upload Image", {
+        description: "Please upload an image to create a gift.",
+      });
+      throw new Error("Please upload an image to create a gift.");
     }
-
     const nftName = createGiftData.name.trim();
     if (!nftName) throw new Error("Enter NFT Name");
 
@@ -596,35 +499,82 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">, // SPL Token (should always exist)
     ]);
     try {
-      if (!imageFile) {
-        toast.error("Upload Image", {
-          description: "Please upload an image to create a gift.",
-        });
-        throw new Error("Please upload an image to create a gift.");
-      }
-
-      if (imageFile?.size > 5 * 1024 * 1024) {
-        toast.error("Image Too Large", {
-          description: "File too large, should be lessthan 5MB",
-        });
-        throw Error("File too large, should be lessthan 5MB");
-      }
+      setGiftCreationStage((prev) => {
+        return [
+          ...prev,
+          {
+            errorMessage: "",
+            stage: CreateGiftStage.UploadingImage,
+            status: GiftCreationStatus.Loading,
+          },
+        ];
+      });
 
       if (!signer) {
         toast.error("Connect Wallet", {
           description: "Please connect your wallet to continue.",
         });
+
         throw Error("Please connect your wallet to continue.");
       }
-
-      const nftDescription = "A present!";
-      const question = createGiftData.securityQuestion;
       let imageCid: string = await uploadImageToPinata(imageFile);
-      // "bafkreidgjaaey4q3ergcx5cz5wv65jlc5yzcmx3ayz5ewe5afdkazjmyga"; // await uploadImageToPinata(imageFile);
-      const metadataCid: string = await uploadMetadataToPinata({
+      const nftDescription = "A present!";
+      let metadataCid: string = await uploadMetadataToPinata({
         nftName,
         nftDescription,
         imageCid,
+      });
+
+      const question = createGiftData.securityQuestion;
+      if (!imageCid || !metadataCid) {
+        setGiftCreationStage((prev) => {
+          const idx = prev.findIndex(
+            (s) => s.stage === CreateGiftStage.UploadingImage
+          );
+          if (idx !== -1) {
+            const updated = [...prev];
+            updated[idx] = {
+              ...updated[idx],
+              errorMessage: "Failed to upload image to IPFS",
+              status: GiftCreationStatus.Error,
+            };
+            return updated;
+          }
+          return prev;
+        });
+        throw new Error(
+          `PINATA ERROR: ${CREATE_GIFT_ERROR.FAILED_TO_UPLOAD_TO_IPFS}`
+        );
+      }
+      // "bafkreidgjaaey4q3ergcx5cz5wv65jlc5yzcmx3ayz5ewe5afdkazjmyga"; // await uploadImageToPinata(imageFile);
+
+      setGiftCreationStage((prev) => {
+        const idx = prev.findIndex(
+          (s) => s.stage === CreateGiftStage.UploadingImage
+        );
+        if (idx !== -1) {
+          // Update existing UploadingImage stage
+          const updated = [...prev];
+          updated[idx] = {
+            ...updated[idx],
+            errorMessage: "",
+            status: GiftCreationStatus.Success,
+          };
+          return updated;
+        }
+        // If not found, just return prev unchanged (or you may choose to push, but per instruction do not)
+        return prev;
+      });
+
+      setGiftCreationStage((prev) => {
+        return [
+          ...prev,
+          {
+            errorMessage: "",
+            stage: CreateGiftStage.WrappingGift,
+            status: GiftCreationStatus.Loading,
+          },
+        ];
       });
 
       // const metadataCid =
@@ -657,10 +607,14 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
         );
 
         const concatenatedHash = new Uint8Array(
-          answerHash_n_1.length + answerHash_n_2.length
+          answerHash_n_1.length + answerHash_n_2.length + salt.length
         );
         concatenatedHash.set(answerHash_n_1, 0);
         concatenatedHash.set(answerHash_n_2, answerHash_n_1.length);
+        concatenatedHash.set(
+          salt,
+          answerHash_n_1.length + answerHash_n_2.length
+        );
 
         const nftMintseed = new Uint8Array(
           await crypto.subtle.digest("SHA-256", concatenatedHash)
@@ -822,7 +776,9 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
         console.log("NFT", nftMint.address);
         console.log("Authorized claimer", authorizedClaimer);
 
-        const [metadataPda] = await findMetadataPda({ mint: nftMint.address });
+        const [metadataPda] = await findMetadataPda({
+          mint: nftMint.address,
+        });
 
         // Create mint account for NFT (mint has 0 decimals, 1 supply, non-fungible!)
         const mintSize = getMintSize();
@@ -1022,10 +978,28 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
           payer: signer,
         });
 
+        setGiftCreationStage((prev) => {
+          const idx = prev.findIndex(
+            (s) => s.stage === CreateGiftStage.WrappingGift
+          );
+          if (idx !== -1) {
+            // Update existing UploadingImage stage
+            const updated = [...prev];
+            updated[idx] = {
+              ...updated[idx],
+              errorMessage: "",
+              status: GiftCreationStatus.Success,
+            };
+            return updated;
+          }
+          // If not found, just return prev unchanged (or you may choose to push, but per instruction do not)
+          return prev;
+        });
+
         // Retry logic: polling a few times with a small delay for the asset to become discoverable.
         // If fetchDigitalAsset fails due to not found, we wait and retry.
         let asset = null;
-        const maxTries = 5;
+        const maxTries = 3;
         const delayMs = 1200;
 
         for (let i = 0; i < maxTries; i++) {
@@ -1052,80 +1026,122 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
           }
         }
 
-        try {
-          // Encrypt the security question with (email + salt) and push it to supabase
-          // Assuming `securityQuestion`, `email`, and `salt` are all defined earlier in the function
+        setGiftCreationStage((prev) => {
+          return [
+            ...prev,
+            {
+              errorMessage: "",
+              stage: CreateGiftStage.SavingGiftInfo,
+              status: GiftCreationStatus.Loading,
+            },
+          ];
+        });
 
-          // Helper: simple encryption using window.crypto.subtle with AES-GCM
-          // Derive a key from (email + salt), encrypt the question
+        const encryptedSecurityQuestion = await encryptQuestion(
+          question,
+          email,
+          salt
+        );
 
-          // Do the encryption
-          const encryptedSecurityQuestion = await encryptQuestion(
-            question,
-            email,
-            salt
-          );
+        // Prepare row for supabase
+        const insertData = {
+          security_question: encryptedSecurityQuestion,
+          sender: signer.address,
+          index: count, // ID field is the u16 used for gift PDA
+          gift_pda: giftPda,
+        };
 
-          // Prepare row for supabase
-          const insertData = {
-            security_question: encryptedSecurityQuestion,
-            sender: signer.address,
-            index: count, // ID field is the u16 used for gift PDA
-            gift_pda: giftPda,
-          };
-
-          // Retry logic with exponential backoff: total ~5 seconds max wait
-          let response;
-          const maxTotalWait = 5000; // ms
-          const initialDelay = 200; // ms
-          const maxAttempts = 5;
-          let delay = initialDelay;
-          let totalWaited = 0;
-          let lastErr;
-          for (let attempt = 0; attempt < maxAttempts; attempt++) {
-            try {
-              response = await fetch(`/api/v1/users/${signer.address}/gifts`, {
-                method: "POST",
-                body: JSON.stringify(insertData),
-                headers: {
-                  "Content-Type": "application/json",
-                },
-              });
-              if (response.ok) break;
-              lastErr = new Error(`HTTP ${response.status}`);
-            } catch (err) {
-              lastErr = err;
-            }
-            if (attempt < maxAttempts - 1) {
-              await new Promise((res) => setTimeout(res, delay));
-              totalWaited += delay;
-              // Prevent exceeding total allowed wait
-              if (totalWaited + delay > maxTotalWait) break;
-              delay *= 2;
-            }
+        // Retry logic with exponential backoff: total ~5 seconds max wait
+        let response;
+        const maxTotalWait = 3000; // ms
+        const initialDelay = 200; // ms
+        const maxAttempts = 3;
+        let delay = initialDelay;
+        let totalWaited = 0;
+        let lastErr;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          try {
+            response = await fetch(`/api/v1/users/${signer.address}/gifts`, {
+              method: "POST",
+              body: JSON.stringify(insertData),
+              headers: {
+                "Content-Type": "application/json",
+              },
+            });
+            if (response.ok) break;
+            lastErr = new Error(`HTTP ${response.status}`);
+          } catch (err) {
+            lastErr = err;
           }
-          if (!response || !response.ok)
-            throw lastErr || new Error("Failed to save data after retries");
-
-          if (!response.ok) {
-            // Try to get error message from response, otherwise default
-            let errMsg = "Failed to save data";
-            try {
-              const errorData = await response.json();
-              errMsg = errorData?.message || errMsg;
-            } catch {}
-            throw new Error(errMsg);
+          if (attempt < maxAttempts - 1) {
+            await new Promise((res) => setTimeout(res, delay));
+            totalWaited += delay;
+            // Prevent exceeding total allowed wait
+            if (totalWaited + delay > maxTotalWait) break;
+            delay *= 2;
           }
-
-          // redirect to /dashboard/gifts/[gift_pda]
-          // window.location.href = `/claim/${giftPda}`;
-        } catch (error) {
-          alert(error + "SUPP N");
         }
+        if (!response || !response.ok)
+          throw lastErr || new Error("Failed to save data after retries");
+
+        if (!response.ok) {
+          // Try to get error message from response, otherwise default
+          let errMsg = "Failed to save data";
+          const errorData = await response.json();
+          errMsg = errorData?.message || errMsg;
+
+          setGiftCreationStage((prev) => {
+            const idx = prev.findIndex(
+              (s) => s.stage === CreateGiftStage.SavingGiftInfo
+            );
+            if (idx !== -1) {
+              // Update existing UploadingImage stage
+              const updated = [...prev];
+              updated[idx] = {
+                ...updated[idx],
+                errorMessage: errMsg,
+                status: GiftCreationStatus.Error,
+              };
+              return updated;
+            }
+            // If not found, just return prev unchanged (or you may choose to push, but per instruction do not)
+            return prev;
+          });
+          throw new Error(errMsg);
+        }
+
+        setGiftCreationStage((prev) => {
+          const idx = prev.findIndex(
+            (s) => s.stage === CreateGiftStage.SavingGiftInfo
+          );
+          if (idx !== -1) {
+            // Update existing UploadingImage stage
+            const updated = [...prev];
+            updated[idx] = {
+              ...updated[idx],
+              errorMessage: "",
+              status: GiftCreationStatus.Success,
+            };
+            return updated;
+          }
+          // If not found, just return prev unchanged (or you may choose to push, but per instruction do not)
+          return prev;
+        });
 
         console.log("NFT created successfully!");
         console.log("Mint address:", nftMint.address);
         console.log("Signature:", sx);
+        setGiftCreationStage((prev) => {
+          return [
+            ...prev,
+            {
+              errorMessage: "",
+              info: String(sx),
+              stage: CreateGiftStage.GiftCreatedSuccessfully,
+              status: GiftCreationStatus.Success,
+            },
+          ];
+        });
       } catch (error: any) {
         if (
           error === "User rejected the request." ||
@@ -1143,10 +1159,29 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
       alert(error + "DNFVNRO");
       console.log(error);
     }
-  };
+  }
+
+  function handleOpenChangeLoadingStagesModal(open: boolean) {
+    if (!open) {
+      // Only allow closing if any stage has status Error
+      const hasError = giftCreationStage.some(
+        (stage) => stage.status === GiftCreationStatus.Error
+      );
+      if (hasError) {
+        setGiftCreationStage([]);
+      }
+      // Otherwise, do nothing (prevent closing)
+    }
+    // If open === true, let modal open naturally (do nothing)
+  }
 
   return (
     <div className="flex flex-col w-full">
+      <LoadingStagesModal
+        giftCreationStage={giftCreationStage}
+        open={giftCreationStage.length !== 0}
+        onOpenChange={handleOpenChangeLoadingStagesModal}
+      />
       <Button
         type="submit"
         variant={"default"}
@@ -1177,33 +1212,6 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
           <ArrowRight />
         </span>
       </Button>
-    </div>
-  );
-}
-
-function NFTPreviewCard({
-  imageFile,
-  nftName = "NFT Gift",
-  giftAmount = 0.001,
-}: {
-  imageFile: File;
-  nftName: string;
-  giftAmount: number;
-}) {
-  return (
-    <div className="flex flex-col items-center bg-white rounded shadow p-3 pb-8 relative border border-neutral-200">
-      <div className="aspect-6/7 bg-neutral-100 rounded-t-xs overflow-hidden w-full flex justify-center items-center border-b border-neutral-200">
-        <img
-          src={URL.createObjectURL(imageFile)}
-          alt="NFT Preview"
-          className="object-cover object-center w-[350px] h-full"
-        />
-      </div>
-      <div className="w-full px-2 pb-1 pt-4 flex flex-row gap-2 justify-end items-center text-xs font-mono text-neutral-700">
-        <span className="truncate text-right">{nftName}</span>
-        <span className="opacity-75 text-right">{giftAmount} SOL</span>
-      </div>
-      <div className="absolute left-3 right-3 bottom-2 h-2 rounded-b-lg bg-neutral-100 blur-sm opacity-50 -z-10" />
     </div>
   );
 }
@@ -1247,6 +1255,13 @@ function UploadImage({ imageFile, setImageFile }: UploadImageProps) {
             className="hidden"
             onChange={(e) => {
               if (e.target.files && e.target.files[0]) {
+                if (e.target.files[0].size > 5 * 1024 * 1024) {
+                  toast.error("Cannot upload image: File is larger than 5MB.");
+
+                  e.target.value = ""; // reset input
+                  return;
+                }
+
                 setImageFile(e.target.files[0]);
               }
             }}
@@ -1262,16 +1277,161 @@ function UploadImage({ imageFile, setImageFile }: UploadImageProps) {
   );
 }
 
-type CountProps = { selected: boolean; status: string };
+function LoadingStagesModal({
+  giftCreationStage,
+  open,
+  onOpenChange,
+}: {
+  giftCreationStage: GiftCreationStage[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const stageLabels: { stage: CreateGiftStage; label: string }[] = [
+    { stage: CreateGiftStage.UploadingImage, label: "Upload Image" },
+    { stage: CreateGiftStage.WrappingGift, label: "Wrapping Gift" },
+    { stage: CreateGiftStage.SavingGiftInfo, label: "Saving Gift Info" },
+    { stage: CreateGiftStage.GiftCreatedSuccessfully, label: "Gift Created!" },
+  ];
 
-function Count({ selected, status }: CountProps) {
+  function getStageInfo(stage: CreateGiftStage): GiftCreationStage | undefined {
+    return giftCreationStage.find((s) => s.stage === stage);
+  }
+
+  const firstError = giftCreationStage.find(
+    (s) => s.status === GiftCreationStatus.Error && s.errorMessage
+  );
+
   return (
-    <span
-      className={`flex items-center justify-center rounded-full h-4 w-4 border-2 font-semibold  ${status === "completed" ? "bg-purple-600 border-purple-600 text-white" : selected ? "border-purple-600" : "bg-neutral-200 border-neutral-200 text-black"} border-solid text-center`}
-    >
-      {/* <span className={`${status === "completed" ? "block" : "hidden"}`}>
-        <Check size={10} strokeWidth={1.2} absoluteStrokeWidth />
-      </span> */}
-    </span>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md [&>button]:hidden rounded-[24px] p-6">
+        <DialogHeader className="flex flex-row items-center justify-between">
+          <DialogTitle className="text-base text-left">
+            Creating Gift
+          </DialogTitle>
+          <DialogPrimitive.Close asChild>
+            <Button
+              variant="outline"
+              className="rounded-[16px] size-8 p-2 shrink-0 cursor-pointer"
+            >
+              <IconXmark className="size-3" />
+            </Button>
+          </DialogPrimitive.Close>
+        </DialogHeader>
+        <div className="flex flex-col gap-3 items-start w-full">
+          {stageLabels.map(({ stage, label }) => {
+            const currentStageInfo = getStageInfo(stage);
+            const isLoading =
+              currentStageInfo?.status === GiftCreationStatus.Loading;
+
+            // Style logic
+            let labelClasses = ["transition-colors", "duration-200"];
+            if (isLoading) {
+              // Opacity 100%, text-2xl, font-bold
+              labelClasses.push(
+                "text-2xl",
+                "opacity-100",
+                "text-black",
+                "font-bold"
+              );
+            } else {
+              // All other: base, opacity-75, regular
+              labelClasses.push("text-base", "opacity-75", "text-black");
+            }
+
+            const isCompleted =
+              currentStageInfo?.status === GiftCreationStatus.Success;
+            const notStarted = !currentStageInfo;
+            const isError =
+              currentStageInfo?.status === GiftCreationStatus.Error;
+
+            return (
+              <div className="flex items-center gap-2.5" key={stage}>
+                {/* Icon */}
+                {isLoading ? (
+                  // Show independent spinner when loading
+                  <span
+                    className="flex items-center justify-center"
+                    style={{ minWidth: "1.25rem", minHeight: "1.25rem" }}
+                  >
+                    <svg
+                      className="animate-spin h-5 w-5 text-gray-500"
+                      fill="none"
+                      viewBox="0 0 16 16"
+                    >
+                      <circle
+                        cx="8"
+                        cy="8"
+                        r="6"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        opacity="0.25"
+                      />
+                      <path
+                        d="M14 8a6 6 0 00-6-6"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </span>
+                ) : (
+                  <span
+                    className={[
+                      "flex items-center justify-center h-5 w-5 rounded-full border-2 border-solid transition-all duration-200",
+                      isCompleted
+                        ? "bg-green-700 border-green-700"
+                        : notStarted
+                          ? "bg-neutral-200 border-neutral-200"
+                          : isError
+                            ? "bg-red-200 border-red-200"
+                            : "bg-gray-100 border-gray-100",
+                    ].join(" ")}
+                    style={{ minWidth: "1.25rem", minHeight: "1.25rem" }}
+                  >
+                    {isCompleted ? (
+                      // Deep green background, white tick
+                      <svg
+                        className="h-3 w-3 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        viewBox="0 0 16 16"
+                      >
+                        <path
+                          d="M4 8.5l3 3 5-5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    ) : isError ? (
+                      // Red exclamation/cross
+                      <svg
+                        className="h-3 w-3 text-red-500"
+                        fill="none"
+                        viewBox="0 0 16 16"
+                      >
+                        <path
+                          d="M4.7 4.7l6.6 6.6M4.7 11.3l6.6-6.6"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    ) : null}
+                  </span>
+                )}
+                {/* Stage Name */}
+                <span className={labelClasses.join(" ")}>{label}</span>
+              </div>
+            );
+          })}
+        </div>
+        {firstError && (
+          <div className="rounded-xl mt-2 p-3 text-xs border border-red-200 bg-red-50 text-black">
+            {firstError.errorMessage}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

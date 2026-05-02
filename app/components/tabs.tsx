@@ -13,7 +13,7 @@ import {
   getProgramDerivedAddress,
   type Address,
 } from "@solana/kit";
-
+import { getBase58Decoder } from "@solana/kit";
 const rpc = createSolanaRpc("https://api.devnet.solana.com");
 const rpcSubscriptions = createSolanaRpcSubscriptions(
   "ws://api.devnet.solana.com"
@@ -89,7 +89,10 @@ const Gifts = () => {
         const { gift_pda } = received[i];
         try {
           const gift = await fetchGift(rpc, gift_pda);
-          const nft = await fetchDigitalAsset(rpc, gift.data.nftMint);
+          const decoder = getBase58Decoder();
+          const nftMint = decoder.decode(new Uint8Array(gift.data.nftMint));
+          const nftMintAddress = address(nftMint);
+          const nft = await fetchDigitalAsset(rpc, nftMintAddress);
           const nftMetadataResponse = await fetch(nft.metadata.uri);
           const nftData = await nftMetadataResponse.json();
           setGiftsReceived((prev) => [
@@ -136,7 +139,10 @@ const Gifts = () => {
         });
         try {
           const gift = await fetchGift(rpc, giftPda);
-          const nft = await fetchDigitalAsset(rpc, gift.data.nftMint);
+          const decoder = getBase58Decoder();
+          const nftMint = decoder.decode(new Uint8Array(gift.data.nftMint));
+          const nftMintAddress = address(nftMint);
+          const nft = await fetchDigitalAsset(rpc, nftMintAddress);
           const nftMetadataResponse = await fetch(nft.metadata.uri);
           const nftData = await nftMetadataResponse.json();
           console.log(nftData);
@@ -171,13 +177,13 @@ const Gifts = () => {
         aria-label="Manage your account"
       >
         <Tabs.Trigger
-          className="flex h-[45px] flex-1 cursor-default select-none items-center justify-center bg-white px-5 text-[15px] leading-none text-mauve11 outline-none first:rounded-tl-md last:rounded-tr-md hover:text-violet11 data-[state=active]:text-violet11 data-[state=active]:shadow-[inset_0_-1px_0_0,0_1px_0_0] data-[state=active]:shadow-current data-[state=active]:focus:relative data-[state=active]:focus:shadow-black"
+          className="flex h-[45px] flex-1 cursor-default select-none items-center justify-center bg-white px-5 text-[15px] leading-none text-mauve11 outline-none first:rounded-tl-md last:rounded-tr-md hover:text-violet11 data-[state=active]:text-violet11 data-[state=active]:border-b-2 data-[state=active]:border-b-black data-[state=active]:focus:relative"
           value="sent"
         >
           Sent
         </Tabs.Trigger>
         <Tabs.Trigger
-          className="flex h-[45px] flex-1 cursor-default select-none items-center justify-center bg-white px-5 text-[15px] leading-none text-mauve11 outline-none first:rounded-tl-md last:rounded-tr-md hover:text-violet11 data-[state=active]:text-violet11 data-[state=active]:shadow-[inset_0_-1px_0_0,0_1px_0_0] data-[state=active]:shadow-current data-[state=active]:focus:relative data-[state=active]:focus:shadow-black"
+          className="flex h-[45px] flex-1 cursor-default select-none items-center justify-center bg-white px-5 text-[15px] leading-none text-mauve11 outline-none first:rounded-tl-md last:rounded-tr-md hover:text-violet11 data-[state=active]:text-violet11 data-[state=active]:border-b-2 data-[state=active]:border-b-black data-[state=active]:focus:relative"
           value="received"
         >
           Received
@@ -191,7 +197,7 @@ const Gifts = () => {
           {giftsSent?.map((gift) => {
             return (
               <div
-                key={gift.giftData.nftMint}
+                key={gift.nftData.image}
                 className="bg-white rounded-2xl p-5 shadow-sm flex flex-col gap-1"
               >
                 <div className="rounded-2xl mb-2 text-left cursor-pointer overflow-hidden">
@@ -250,7 +256,7 @@ const Gifts = () => {
         {giftsReceived?.map((gift) => {
           return (
             <div
-              key={gift.giftData.nftMint}
+              key={gift.nftData.image}
               className="bg-white rounded-2xl p-5 shadow-sm flex flex-col gap-1"
             >
               <div className="rounded-2xl mb-2 text-left cursor-pointer overflow-hidden">

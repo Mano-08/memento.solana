@@ -16,11 +16,38 @@ interface DatePickerProps {
   setBirthday: (date: Date) => void;
 }
 
+/**
+ * Fixes Next.js hydration mismatch warnings by:
+ * - Avoids calling Date or formatting date during SSR/initial render.
+ * - Uses a client-only effect to safely set `today`.
+ * - Only renders the interactive date UI once the component is mounted on client.
+ *
+ * This prevents server vs client mismatches from Date/formatting.
+ */
 export function DatePicker({ birthday, setBirthday }: DatePickerProps) {
-  // Ensure that today is always the minimum selectable date
-  const today = startOfDay(new Date());
+  // State to safely store 'today' after mounting on the client
+  const [today, setToday] = React.useState<Date | null>(null);
 
-  // If birthday is null, show calendar this month by default
+  // Hydration-safe: only set today's date after mounting (on client)
+  React.useEffect(() => {
+    setToday(startOfDay(new Date()));
+  }, []);
+
+  // Don't render anything until mounted and today is available (prevents hydration mismatch)
+  if (!today) {
+    return (
+      <Button
+        disabled
+        variant="outline"
+        className="w-[150px] justify-between rounded-md bg-transparent border-none outline-none shadow-none hover:bg-white/10 hover:text-neutral-300 text-left font-semibold text-neutral-300"
+      >
+        <span>Pick a date</span>
+        <ChevronDownIcon />
+      </Button>
+    );
+  }
+
+  // Calculate default month (now safe!)
   const defaultMonth =
     birthday && isBefore(startOfDay(birthday), today)
       ? today
@@ -34,6 +61,7 @@ export function DatePicker({ birthday, setBirthday }: DatePickerProps) {
           data-empty={!birthday}
           className="w-[150px] justify-between rounded-md bg-transparent border-none outline-none shadow-none hover:bg-white/10 hover:text-neutral-300 text-left font-semibold text-neutral-300"
         >
+          {/* Formatting date only now that we're on client */}
           {birthday ? format(birthday, "PPP") : <span>Pick a date</span>}
           <ChevronDownIcon />
         </Button>

@@ -17,18 +17,21 @@ import Footer from "./components/footer";
 export default function Home() {
   return (
     <>
-      <main className="min-h-screen flex flex-col items-center">
-        <section className="min-h-screen bg-custom-landing w-full flex items-center justify-center">
-          <div className="flex-col md:flex-row flex items-center justify-center max-w-5xl w-full gap-20">
-            <div className="flex flex-col justify-center items-start">
-              <h1 className={`text-7xl text-left ${bricolage.className}`}>
-                <span className="block animate-slideUp text-white">
-                  Thoughtful <br /> gifts <br />
-                  <span className="text-colored">start here.</span>
+      <main className="min-h-screen flex flex-col items-center justify-center w-screen overflow-x-hidden">
+        <section className="min-h-screen py-10 bg-custom-landing w-full flex items-center justify-center">
+          <div className="flex-col-reverse md:flex-row flex items-center justify-center max-w-5xl w-full gap-20">
+            <div className="flex flex-col justify-center items-center md:items-start">
+              <h1
+                className={`text-4xl md:text-7xl text-center md:text-left w-full md:w-auto ${bricolage.className}`}
+              >
+                <span className="block animate-slideUp text-neutral-500 ">
+                  Thoughtful <br className="md:block hidden" /> gifts <br />
+                  {/* <span className="text-colored">start here.</span> */}
+                  <span className="text-neutral-400">start here.</span>
                 </span>
               </h1>
               <div
-                className={`text-lg mt-2 delay-200! animate-slideUp text-white/50 max-w-2xl text-left font-medium`}
+                className={`text-sm md:text-lg mt-2 delay-200! animate-slideUp text-neutral-500 max-w-2xl text-center md:text-left font-medium`}
               >
                 Send an NFT, set the unlock date, and surprise someone special.
                 Make moments memorable on-chain.
@@ -38,12 +41,12 @@ export default function Home() {
                 <div className="delay-400! animate-slideUp">
                   <Link
                     href="/create"
-                    className=" hover:bg-white/90 bg-white px-[100px] text-black py-2 text-2xl items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark"
+                    className=" hover:bg-amber-400/90 bg-amber-400 px-[100px] text-black py-2 text-xl md:text-2xl items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark"
                   >
                     Gift now!
                   </Link>
                 </div>
-                <p className="inline-flex gap-2 group text-sm delay-600! animate-slideUp text-white/80">
+                <p className="inline-flex gap-2 group text-xs md:text-sm delay-600! animate-slideUp text-white/80">
                   <span>powered by</span>
                   <Image
                     src={solanaLogoMark}
@@ -61,26 +64,26 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="flex flex-col items-center justify-center">
-              <div className="relative flex flex-row items-center w-[400px] h-[400px] group">
+            <div className="flex flex-col items-center justify-center w-full">
+              <div className="relative flex flex-row items-center w-[220px] h-[220px] md:my-0 my-[75px] md:w-[400px] md:h-[400px] group">
                 {/* Aurora Image (top card) */}
                 <div className="absolute -top-7" style={{ perspective: 1200 }}>
                   <div
                     className="
-                      bg-white rounded-xl shadow-xl border w-[400px] border-gray-300 p-2
+                      bg-white rounded-xl shadow-xl border w-[220px] md:w-[400px] border-gray-300 p-2
                       transition-transform duration-500
                       hover:scale-110 rotate-8 group-hover:-rotate-8 max-w-[450px]
                       [box-shadow:0_8px_32px_rgba(0,0,0,0.16),0_2px_8px_rgba(0,0,0,0.08)]
                       origin-70%_80%
                       group-hover:-translate-y-7
                       group-hover:-translate-x-64
-                     
+                     animate-slideUp
                     "
                   >
                     <Image
                       src={auroraImage}
                       alt="trekking with my sister the summer of 2025"
-                      className="rounded-md block object-cover w-full h-[400px]"
+                      className="rounded-md block object-cover w-full h-[220px] md:h-[400px]"
                     />
                     <div className="mt-5 mb-2 px-1 text-center text-xs font-mono text-gray-600">
                       Winter 2009 • Lua and Aurora
@@ -91,18 +94,19 @@ export default function Home() {
                 <div className="absolute top-7" style={{ perspective: 1200 }}>
                   <div
                     className="
-                      bg-neutral-50 rounded-xl shadow-xl border w-[400px] border-gray-300 p-2
+                      bg-neutral-50 rounded-xl shadow-xl border w-[220px] md:w-[400px] border-gray-300 p-2
                       transition-transform duration-500
                       hover:scale-110 -rotate-6 group-hover:rotate-6 max-w-[450px]
                       [box-shadow:0_8px_32px_rgba(0,0,0,0.16),0_2px_8px_rgba(0,0,0,0.08)]
                       origin-70%_80%
                       group-hover:translate-y-8
+                      animate-slideUp
                     "
                   >
                     <Image
                       src={helpingHandImage}
                       alt="trekking with my sister the summer of 2025"
-                      className="rounded-md block object-cover w-full h-[400px]"
+                      className="rounded-md block object-cover w-full h-[220px] md:h-[400px]"
                     />
                     <div className="mt-5 mb-2 px-1 text-center text-xs font-mono text-gray-600">
                       Summer 2012 • Fun times in San Francisco

@@ -121,9 +121,14 @@ solana-test-validator --bpf-program metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s 
 
 DEADLINES:
 
-[] build UI for Demo
-[] build claim-gift UI for Demo
-[] change DB schema
+[DONE] create user if not exist once login into supabase
+[DONE] store user information
+[] update frontend for demo
+
+- [] /
+- [] /create
+- [] /claim
+- [DONE] /dashboard
 
 per user we have gift count: so all the gifts upto that index is claimed or not_claimed or cancelled.
 db stores gift_id and encrypted question
