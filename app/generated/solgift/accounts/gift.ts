@@ -62,7 +62,7 @@ export type Gift = {
   authorizedClaimer: Address;
   assetRecipient: Address;
   index: number;
-  nftMint: ReadonlyUint8Array;
+  nftMint: Address;
   answerHash: ReadonlyUint8Array;
   claimed: boolean;
   solAmount: bigint;
@@ -78,7 +78,7 @@ export type GiftArgs = {
   authorizedClaimer: Address;
   assetRecipient: Address;
   index: number;
-  nftMint: ReadonlyUint8Array;
+  nftMint: Address;
   answerHash: ReadonlyUint8Array;
   claimed: boolean;
   solAmount: number | bigint;
@@ -98,7 +98,7 @@ export function getGiftEncoder(): FixedSizeEncoder<GiftArgs> {
       ["authorizedClaimer", getAddressEncoder()],
       ["assetRecipient", getAddressEncoder()],
       ["index", getU16Encoder()],
-      ["nftMint", fixEncoderSize(getBytesEncoder(), 32)],
+      ["nftMint", getAddressEncoder()],
       ["answerHash", fixEncoderSize(getBytesEncoder(), 32)],
       ["claimed", getBooleanEncoder()],
       ["solAmount", getU64Encoder()],
@@ -120,7 +120,7 @@ export function getGiftDecoder(): FixedSizeDecoder<Gift> {
     ["authorizedClaimer", getAddressDecoder()],
     ["assetRecipient", getAddressDecoder()],
     ["index", getU16Decoder()],
-    ["nftMint", fixDecoderSize(getBytesDecoder(), 32)],
+    ["nftMint", getAddressDecoder()],
     ["answerHash", fixDecoderSize(getBytesDecoder(), 32)],
     ["claimed", getBooleanDecoder()],
     ["solAmount", getU64Decoder()],

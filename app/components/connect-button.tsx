@@ -39,6 +39,7 @@ import {
 
 interface ConnectButtonProps {
   className?: string;
+  text?: string;
 }
 
 /**
@@ -56,7 +57,7 @@ interface ConnectButtonProps {
  *
  * This prevents forcing the user to re-auth if they're already logged in.
  */
-export function ConnectButton({ className }: ConnectButtonProps) {
+export function ConnectButton({ className, text }: ConnectButtonProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
@@ -306,11 +307,7 @@ export function ConnectButton({ className }: ConnectButtonProps) {
     return (
       <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className={cn("gap-2", className)}
-          >
+          <Button variant="outline" size="sm" className={cn("gap-2")}>
             <Avatar className="h-5 w-5">
               {walletIcon && (
                 <AvatarImage
@@ -351,16 +348,15 @@ export function ConnectButton({ className }: ConnectButtonProps) {
         <Spinner className="h-4 w-4" />
         <span className="text-xs">Connecting...</span>
       </>
+    ) : text ? (
+      text
     ) : (
       "Connect Wallet"
     );
 
     return (
       <>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="font-semibold cursor-pointer text-white/50 hover:text-black/90 hover:bg-white/60 my-2 px-3 py-1 text-sm rounded-full"
-        >
+        <button onClick={() => setIsModalOpen(true)} className={className}>
           {buttonContent}
         </button>
         <WalletModal

@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use mpl_token_metadata::accounts::MasterEdition;
 use crate::constants::SEED_GIFT_ACCOUNT;
 use solana_program::hash::hash;
 use crate::error::{ClaimError, GiftError};
@@ -30,7 +31,6 @@ pub struct ClaimGift<'info> {
     pub gift: Account<'info, Gift>,
     #[account(
         constraint = nft_mint.supply == 1               @ GiftError::NotAnNFT,
-        constraint = nft_mint.mint_authority.is_none()  @ GiftError::MintAuthorityNotRevoked,
         constraint = nft_mint.decimals == 0             @ GiftError::NotAnNFT,
     )]
     pub nft_mint: InterfaceAccount<'info, Mint>,
@@ -55,6 +55,15 @@ pub struct ClaimGift<'info> {
 }
 
 pub fn claim_gift(ctx: Context<ClaimGift>, answer_hash_n_1: [u8; 32]) -> Result<()> {
+    let mint = &ctx.accounts.nft_mint;
+    let (master_edition_pda, _) = MasterEdition::find_pda(&mint.key());
+    let mint_authority = mint.mint_authority;
+    require!(
+        mint_authority == Option::None.into() 
+            || mint_authority == Option::Some(master_edition_pda).into(),
+        GiftError::MintAuthorityNotRevoked
+    );
+    
     let gift = &mut ctx.accounts.gift;
     let current_time = Clock::get()?.unix_timestamp;
 
@@ -82,7 +91,7 @@ pub fn claim_gift(ctx: Context<ClaimGift>, answer_hash_n_1: [u8; 32]) -> Result<
     
     
     let cpi_accounts = TransferChecked {
-        mint: ctx.accounts.nft_mint.to_account_info(),
+        mint: mint.to_account_info(),
         from: ctx.accounts.gift_nft_ata.to_account_info(),
         to: ctx.accounts.asset_recipient_nft_ata.to_account_info(),
         authority: gift.to_account_info(),
@@ -90,7 +99,7 @@ pub fn claim_gift(ctx: Context<ClaimGift>, answer_hash_n_1: [u8; 32]) -> Result<
     let cpi_program = ctx.accounts.token_program.to_account_info();
     let cpi_context = CpiContext::new(cpi_program, cpi_accounts)
         .with_signer(signer_seeds);
-    let decimals = ctx.accounts.nft_mint.decimals;
+    let decimals = mint.decimals;
     token_interface::transfer_checked(cpi_context, 1, decimals)?;
 
     // Close the NFT ATA (escrow) and send rent to the asset_recipient
@@ -114,7 +123,6 @@ pub fn claim_gift(ctx: Context<ClaimGift>, answer_hash_n_1: [u8; 32]) -> Result<
     // Mark gift as claimed and store claim time
     gift.claimed = true;
     gift.claimed_on = current_time;
-    gift.nft_mint = ctx.accounts.nft_mint.key().to_bytes();
     gift.asset_recipient = *ctx.accounts.asset_recipient.key;
     
     // Emit the GiftClaimed event

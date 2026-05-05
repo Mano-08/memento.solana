@@ -7,6 +7,7 @@ use crate::state::Gift;
 use crate::state::User;
 use anchor_lang::system_program;
 use anchor_spl::associated_token::AssociatedToken;
+use mpl_token_metadata::accounts::MasterEdition;
 use anchor_spl::{token_interface::{Mint, TokenInterface,TokenAccount}};
 
 #[event]
@@ -43,9 +44,8 @@ pub struct CreateGift<'info> {
     )]
     pub gift: Account<'info, Gift>,
     #[account(
-        constraint = nft_mint.supply == 1               @ GiftError::NotAnNFT,
-        constraint = nft_mint.mint_authority.is_none()  @ GiftError::MintAuthorityNotRevoked,
-        constraint = nft_mint.decimals == 0             @ GiftError::NotAnNFT,
+        constraint = nft_mint.supply == 1       @ GiftError::NotAnNFT,
+        constraint = nft_mint.decimals == 0     @ GiftError::NotAnNFT,
     )]
     pub nft_mint: InterfaceAccount<'info, Mint>,
     #[account(
@@ -89,6 +89,15 @@ pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 3
         gift_nft_ata.amount == 1,
         GiftError::GiftPDADoesNotHaveNFT
     );
+    
+    let (master_edition_pda, _) = MasterEdition::find_pda(&mint.key());
+    let mint_authority = mint.mint_authority;
+    require!(
+        mint_authority == Option::None.into() 
+            || mint_authority == Option::Some(master_edition_pda).into(),
+        GiftError::MintAuthorityNotRevoked
+    );
+
     let gift = &mut ctx.accounts.gift;
     let user = &mut ctx.accounts.user;
     gift.created_on = Clock::get()?.unix_timestamp as i64;
@@ -98,6 +107,7 @@ pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 3
         GiftError::CannotGiftToPast
     );
     gift.answer_hash = answer_hash;
+    gift.nft_mint = mint.key();
     gift.salt = salt;
     gift.delivery_date = delivery_date;
     gift.sol_amount = sol_amount;

@@ -1058,3 +1058,38 @@ body {
 .bg-custom-gradient {
   background: rgb(43, 38, 54);
 }
+
+.shaky {
+  animation: shaky-border 2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px dashed #ff4848;
+  border-radius: 0.5rem;
+}
+
+@keyframes shaky-border {
+  0% {
+    border-width: 1px;
+    border-style: dashed;
+    border-color: #ff4848;
+    box-shadow: 0 0 0 0 #ff48488a;
+  }
+  10% {
+    border-width: 1px;
+    border-style: dashed;
+    border-color: #ff4848;
+    box-shadow: 0 0 6px 1px #ff48484d;
+  }
+  85% {
+    border-width: 1px;
+    border-style: dashed;
+    border-color: #ff4848;
+    box-shadow: 0 0 3px 0 #ff48484d;
+    opacity: 1;
+  }
+  100% {
+    border-width: 1px;
+    border-style: dashed;
+    border-color: #ff4848;
+    box-shadow: 0 0 0 0 #0000;
+    opacity: 1;
+  }
+}

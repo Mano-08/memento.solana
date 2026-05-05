@@ -9,7 +9,7 @@ pub struct Gift {
     pub authorized_claimer:    Pubkey,              // 32 Bytes
     pub asset_recipient:       Pubkey,              // 32 Bytes
     pub index:                 u16,                 // 2 Bytes
-    pub nft_mint:              [u8; 32],            // 32 Bytes
+    pub nft_mint:              Pubkey,              // 32 Bytes
     pub answer_hash:           [u8; 32],            // 32 Bytes
     pub claimed:               bool,                // 1 Byte
     pub sol_amount:            u64,                 // 8 Bytes

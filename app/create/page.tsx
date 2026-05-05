@@ -2,13 +2,7 @@
 
 import "@radix-ui/themes/styles.css";
 import { toast } from "sonner";
-
-type Steps = {
-  [key: string]: {
-    hash: `#${string}`;
-    title: string;
-  };
-};
+import bs58 from "bs58";
 enum CREATE_GIFT_ERROR {
   FAILED_TO_UPLOAD_TO_IPFS = "failed to upload data to IPFS storage",
 }
@@ -30,7 +24,9 @@ export enum CreateGiftStage {
 }
 import {
   fetchDigitalAsset,
+  findMasterEditionPda,
   findMetadataPda,
+  getCreateMasterEditionV3Instruction,
   getCreateMetadataAccountV3Instruction,
 } from "@metaplex-foundation/mpl-token-metadata-kit";
 import {
@@ -97,12 +93,14 @@ import {
 import {
   ArrowRight,
   Calendar,
+  Check,
   DollarSign,
   ImageUpIcon,
   Key,
   LockKeyhole,
   Mail,
   Sparkles,
+  Van,
 } from "lucide-react";
 import { DatePicker } from "@/app/components/datepicker";
 import { Button } from "../components/ui/button";
@@ -110,6 +108,7 @@ import { IconXmark } from "symbols-react";
 import { createPrivyTransactionSendingSigner, rpc } from "../lib/utils";
 import { usePrivy } from "@privy-io/react-auth";
 import { ConnectButton } from "../components/connect-button";
+import Link from "next/link";
 
 type CreateGiftData = {
   name: string;
@@ -129,7 +128,9 @@ enum GiftCreationStatus {
 export default function CreateGiftForm() {
   const { ready, user, authenticated } = usePrivy();
   const { isConnected, isConnecting, account, connector } = useConnector();
-
+  const [giftInputError, setGiftInputError] = useState<GiftInputError | null>(
+    null
+  );
   const formattedDate = getToday();
   const uiWallets = useWallets();
   const { wallets } = privyUseWallets();
@@ -153,6 +154,65 @@ export default function CreateGiftForm() {
     securityAnswer: "linkinpark",
   });
 
+  useEffect(() => {
+    // Watch for giftInputError, and automatically clear it if the new input resolves the error
+    if (giftInputError !== null) {
+      switch (giftInputError) {
+        case GiftInputError.gift_name:
+          if (createGiftData.name && createGiftData.name.trim().length > 0) {
+            setGiftInputError(null);
+          }
+          break;
+        case GiftInputError.gift_image:
+          if (imageFile) {
+            setGiftInputError(null);
+          }
+          break;
+        case GiftInputError.gift_amount:
+          if (
+            createGiftData.giftAmount &&
+            !isNaN(createGiftData.giftAmount) &&
+            createGiftData.giftAmount > 0
+          ) {
+            setGiftInputError(null);
+          }
+          break;
+        case GiftInputError.recipient_email:
+          if (createGiftData.email && createGiftData.email.trim().length > 0) {
+            setGiftInputError(null);
+          }
+          break;
+        case GiftInputError.reveal_date:
+          if (
+            createGiftData.birthday &&
+            createGiftData.birthday.trim().length > 0
+          ) {
+            setGiftInputError(null);
+          }
+          break;
+        case GiftInputError.security_question:
+          if (
+            createGiftData.securityQuestion &&
+            createGiftData.securityQuestion.trim().length > 0
+          ) {
+            setGiftInputError(null);
+          }
+          break;
+        case GiftInputError.security_answer:
+          if (
+            createGiftData.securityAnswer &&
+            createGiftData.securityAnswer.trim().length > 0
+          ) {
+            setGiftInputError(null);
+          }
+          break;
+        default:
+          // Do nothing for unknown error types
+          break;
+      }
+    }
+  }, [createGiftData]);
+
   const [imageFile, setImageFile] = useState<null | File>(null);
 
   const handleSetGiftAmount = useCallback(
@@ -165,7 +225,7 @@ export default function CreateGiftForm() {
   );
 
   const handleSetGiftName = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       setCreateGiftData((prev) => {
         return { ...prev, name: e.target.value };
       });
@@ -239,8 +299,14 @@ export default function CreateGiftForm() {
         onSubmit={(e) => e.preventDefault()}
         className="max-w-5xl mx-auto flex md:flex-row flex-col justify-center items-start"
       >
-        <div className={` flex flex-col gap-4 rounded-[44px] p-6 w-full`}>
-          <UploadImage imageFile={imageFile} setImageFile={setImageFile} />
+        <div
+          className={`md:max-w-[30vw] flex flex-col gap-4 rounded-[44px] p-6 w-full`}
+        >
+          <UploadImage
+            giftInputError={giftInputError}
+            imageFile={imageFile}
+            setImageFile={setImageFile}
+          />
 
           <fieldset className="flex w-full font-semibold text-sm flex-row justify-between items-center py-3.5 bg-white/5 px-3 rounded-lg">
             <label
@@ -256,14 +322,20 @@ export default function CreateGiftForm() {
           className={` flex flex-col font-bold gap-4 rounded-[44px] p-6 w-full`}
         >
           <fieldset className="flex w-full flex-col justify-start">
-            <input
-              className="rounded-md shrink-0 grow text-left text-5xl border-none py-2.5 leading-none text-neutral-300 outline-none"
+            <textarea
+              className={`${giftInputError === GiftInputError.gift_name && "shaky"} rounded-md shrink-0 grow text-left text-5xl border-none py-2.5 leading-none text-neutral-300 outline-none resize-none min-h-[64px]`}
               id="nftName"
-              type="text"
               name="nftName"
               value={createGiftData.name}
               onChange={handleSetGiftName}
-              placeholder="Happy birthday!"
+              placeholder="Ol days Laura"
+              rows={1}
+              style={{
+                whiteSpace: "pre-line",
+                wordBreak: "break-word",
+                overflowWrap: "break-word",
+                overflowY: "auto",
+              }}
             />
           </fieldset>
           <fieldset className="flex w-full font-semibold text-sm flex-row justify-between items-center bg-white/5 py-1 pl-3 pr-1 rounded-lg">
@@ -304,7 +376,9 @@ export default function CreateGiftForm() {
               }}
             />
           </fieldset>
-          <fieldset className="flex w-full font-semibold text-sm flex-row justify-between items-center bg-white/5 py-1 pl-3 pr-1 rounded-lg">
+          <fieldset
+            className={`${giftInputError === GiftInputError.recipient_email && "shaky"} flex w-full font-semibold text-sm flex-row justify-between items-center bg-white/5 py-1 pl-3 pr-1 rounded-lg`}
+          >
             <label
               className="flex flex-row items-center gap-2 text-neutral-400 leading-none"
               htmlFor="email"
@@ -312,7 +386,7 @@ export default function CreateGiftForm() {
               <Mail size={16} /> Recipient Email
             </label>
             <input
-              className="rounded-full shrink-0 text-right grow border-none py-2.5 text-sm px-3 leading-none text-neutral-300 outline-none"
+              className={`rounded-full shrink-0 text-right grow border-none py-2.5 text-sm px-3 leading-none text-neutral-300 outline-none`}
               id="email"
               type="text"
               value={createGiftData.email}
@@ -322,7 +396,9 @@ export default function CreateGiftForm() {
             />
           </fieldset>
 
-          <fieldset className="flex w-full font-semibold text-sm flex-row justify-between items-center bg-white/5 py-1 px-3 rounded-lg">
+          <fieldset
+            className={`${giftInputError === GiftInputError.gift_amount && "shaky"} flex w-full font-semibold text-sm flex-row justify-between items-center bg-white/5 py-1 px-3 rounded-lg`}
+          >
             <label
               className="flex flex-row items-center gap-2 text-neutral-400 leading-none"
               htmlFor="giftAmount"
@@ -344,7 +420,9 @@ export default function CreateGiftForm() {
             </div>
           </fieldset>
 
-          <div className="flex flex-col items-start rounded-lg bg-white/5 py-1">
+          <div
+            className={`${(giftInputError === GiftInputError.security_question || giftInputError === GiftInputError.security_answer) && "shaky"}  flex flex-col items-start rounded-lg bg-white/5 py-1`}
+          >
             <fieldset className="flex w-full font-semibold text-sm flex-row gap-2 justify-between items-center pl-3 pr-1 rounded-lg">
               <LockKeyhole size={16} className="text-neutral-400" />
               <div className="border-b w-full border-black/5 border-solid flex flex-row items-center">
@@ -376,7 +454,7 @@ export default function CreateGiftForm() {
                   Security Answer
                 </label>
                 <input
-                  className="border-solid shrink-0 text-right grow py-2.5 text-sm px-3 leading-none text-neutral-300 outline-none"
+                  className="border-solid shrink-0 text-right grow py-2.5 text-sm px-3 leading-none text-neutral-300 outline-none focus:bg-transparent focus-visible:bg-transparent"
                   id="answer"
                   type="text"
                   onChange={handleSetSecurityAnswer}
@@ -391,16 +469,18 @@ export default function CreateGiftForm() {
             <SendGiftWithExternalWallet
               uiWalletAccount={uiWalletAccount}
               imageFile={imageFile}
+              setGiftInputError={setGiftInputError}
               createGiftData={createGiftData}
             />
           ) : connectedToEmbeddedWallet && wallet !== undefined ? (
             <SendGiftWithEmbeddedWallet
               wallet={wallet}
               imageFile={imageFile}
+              setGiftInputError={setGiftInputError}
               createGiftData={createGiftData}
             />
           ) : (
-            <ConnectButton />
+            <ConnectButton className="font-semibold cursor-pointer text-white/50 hover:text-black/90 hover:bg-white/60 my-2 px-3 py-1 text-sm rounded-full" />
           )}
         </div>
       </form>
@@ -411,11 +491,15 @@ export default function CreateGiftForm() {
 type SendGiftWithExternalWalletProps = {
   uiWalletAccount: UiWalletAccount;
   imageFile: File | null;
+  setGiftInputError: React.Dispatch<
+    React.SetStateAction<GiftInputError | null>
+  >;
   createGiftData: CreateGiftData;
 };
 function SendGiftWithExternalWallet({
   uiWalletAccount,
   imageFile,
+  setGiftInputError,
   createGiftData,
 }: SendGiftWithExternalWalletProps) {
   const signer = useWalletAccountTransactionSendingSigner(
@@ -427,6 +511,7 @@ function SendGiftWithExternalWallet({
     <SendGift
       signer={signer}
       imageFile={imageFile}
+      setGiftInputError={setGiftInputError}
       createGiftData={createGiftData}
     />
   );
@@ -435,17 +520,22 @@ function SendGiftWithExternalWallet({
 type SendGiftWithEmbeddedWalletProps = {
   wallet: ConnectedStandardSolanaWallet;
   imageFile: File | null;
+  setGiftInputError: React.Dispatch<
+    React.SetStateAction<GiftInputError | null>
+  >;
   createGiftData: CreateGiftData;
 };
 function SendGiftWithEmbeddedWallet({
   wallet,
   imageFile,
+  setGiftInputError,
   createGiftData,
 }: SendGiftWithEmbeddedWalletProps) {
   const signer = createPrivyTransactionSendingSigner(wallet);
   return (
     <SendGift
       signer={signer}
+      setGiftInputError={setGiftInputError}
       imageFile={imageFile}
       createGiftData={createGiftData}
     />
@@ -459,12 +549,30 @@ type GiftCreationStage = {
   errorMessage: string;
 };
 
+enum GiftInputError {
+  gift_name = "gift_name",
+  gift_image = "gift_image",
+  reveal_date = "reveal_date",
+  recipient_email = "recipient_email",
+  gift_amount = "gift_amount",
+  security_question = "security_question",
+  security_answer = "security_answer",
+}
+
 type SendGiftProps = {
   signer: TransactionSigner<string>;
   imageFile: File | null;
+  setGiftInputError: React.Dispatch<
+    React.SetStateAction<GiftInputError | null>
+  >;
   createGiftData: CreateGiftData;
 };
-function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
+function SendGift({
+  signer,
+  imageFile,
+  createGiftData,
+  setGiftInputError,
+}: SendGiftProps) {
   const encoder = useMemo(() => new TextEncoder(), []);
   const [giftCreationStage, setGiftCreationStage] = useState<
     GiftCreationStage[]
@@ -476,8 +584,53 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
 
     if (!imageFile) {
       toast.error("Upload Image");
+      setGiftInputError(GiftInputError.gift_image);
       throw new Error("Please upload an image to create a gift.");
     }
+    if (!createGiftData.name || createGiftData.name.trim().length === 0) {
+      toast.error("Enter gift name");
+      setGiftInputError(GiftInputError.gift_name);
+      throw new Error("Please enter a name for the gift.");
+    }
+    if (
+      !createGiftData.giftAmount ||
+      isNaN(createGiftData.giftAmount) ||
+      createGiftData.giftAmount <= 0
+    ) {
+      toast.error("Enter valid gift amount");
+      setGiftInputError(GiftInputError.gift_amount);
+      throw new Error("Please enter a valid gift amount.");
+    }
+    if (!createGiftData.email || createGiftData.email.trim().length === 0) {
+      toast.error("Enter recipient email");
+      setGiftInputError(GiftInputError.recipient_email);
+      throw new Error("Please enter a valid recipient email.");
+    }
+    if (
+      !createGiftData.birthday ||
+      createGiftData.birthday.trim().length === 0
+    ) {
+      toast.error("Enter reveal date");
+      setGiftInputError(GiftInputError.reveal_date);
+      throw new Error("Please enter a reveal date.");
+    }
+    if (
+      !createGiftData.securityQuestion ||
+      createGiftData.securityQuestion.trim().length === 0
+    ) {
+      toast.error("Enter security question");
+      setGiftInputError(GiftInputError.security_question);
+      throw new Error("Please enter a security question.");
+    }
+    if (
+      !createGiftData.securityAnswer ||
+      createGiftData.securityAnswer.trim().length === 0
+    ) {
+      toast.error("Enter security answer");
+      setGiftInputError(GiftInputError.security_answer);
+      throw new Error("Please enter a security answer.");
+    }
+
     const nftName = createGiftData.name.trim();
     if (!nftName) throw new Error("Enter NFT Name");
 
@@ -804,7 +957,7 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
           data: {
             name: nftName as string,
             symbol: "GIFT",
-            uri: `https://sapphire-tremendous-mackerel-441.mypinata.cloud/ipfs/${metadataCid}`,
+            uri: `https://${process.env.NEXT_PUBLIC_PINATA_GATEWAY}/ipfs/${metadataCid}`,
             sellerFeeBasisPoints: 0, // no royalties
             creators: null, // or provide an array with creators if you want
             collection: null,
@@ -814,10 +967,24 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
           collectionDetails: null,
         });
 
+        const [masterEditionPda] = await findMasterEditionPda({
+          mint: nftMint.address,
+        });
+
+        const createMasterEditionIx = getCreateMasterEditionV3Instruction({
+          edition: masterEditionPda,
+          mint: nftMint.address,
+          updateAuthority: signer,
+          mintAuthority: signer,
+          payer: signer,
+          metadata: metadataPda,
+          maxSupply: 0, // 0 = unique NFT, no prints allowed
+        });
+
         // Revoke mint authority so no more tokens can ever be minted for this NFT.
         const revokeMintIx = getSetAuthorityInstruction({
           owned: nftMint.address,
-          owner: signer,
+          owner: masterEditionPda,
           authorityType: AuthorityType.MintTokens,
           newAuthority: null,
         });
@@ -825,7 +992,7 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
         // Revoke freeze authority so mint can't be frozen/unfrozen anymore.
         const revokeFreezeIx = getSetAuthorityInstruction({
           owned: nftMint.address,
-          owner: signer,
+          owner: masterEditionPda,
           authorityType: AuthorityType.FreezeAccount,
           newAuthority: null,
         });
@@ -923,26 +1090,14 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
           authorizedClaimer: authorizedClaimer,
         });
 
-        // console.log("CREATE GIFT ALL DATA", {
-        //   signer: signer,
-        //   user: userPda,
-        //   gift: giftPda,
-        //   nftMint: nftMint.address,
-        //   salt: salt,
-        //   answerHash: answerHash,
-        //   solAmount: solAmount,
-        //   deliveryDate: birthdayTimestamp,
-        //   authorizedClaimer: authorizedClaimer,
-        // });
-        // console.log("INDEX", count);
-
         instructions.push(createMintAccountIx); // allocate
         instructions.push(initMintIx); // initialize mint, signer = authority
         instructions.push(createAtaIx); // create gift PDA's ATA
         instructions.push(mintToIx); // mint 1 token → supply = 1
         instructions.push(createMetadataIx); // attach metadata, signer still authority ✅
-        instructions.push(revokeMintIx); // mint_authority → None ✅
-        instructions.push(revokeFreezeIx); // freeze_authority → None
+        instructions.push(createMasterEditionIx);
+        // instructions.push(revokeMintIx); // mint_authority → None ✅
+        // instructions.push(revokeFreezeIx); // freeze_authority → None
         instructions.push(createGiftIx); // Anchor checks all pass ✅
         instructions.push(fundRecipientIx);
 
@@ -1095,15 +1250,13 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
           return prev;
         });
 
-        // console.log("NFT created successfully!");
-        // console.log("Mint address:", nftMint.address);
-        // console.log("Signature:", sx);
+        const signatureBase58 = bs58.encode(sx);
         setGiftCreationStage((prev) => {
           return [
             ...prev,
             {
               errorMessage: "",
-              info: String(sx),
+              info: signatureBase58,
               stage: CreateGiftStage.GiftCreatedSuccessfully,
               status: GiftCreationStatus.Success,
             },
@@ -1208,6 +1361,8 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
   return (
     <div className="flex flex-col w-full">
       <LoadingStagesModal
+        imageFile={imageFile}
+        createGiftData={createGiftData}
         giftCreationStage={giftCreationStage}
         open={giftCreationStage.length !== 0}
         onOpenChange={handleOpenChangeLoadingStagesModal}
@@ -1248,13 +1403,18 @@ function SendGift({ signer, imageFile, createGiftData }: SendGiftProps) {
 
 type UploadImageProps = {
   imageFile: null | File;
+  giftInputError: GiftInputError | null;
   setImageFile: React.Dispatch<React.SetStateAction<File | null>>;
 };
-function UploadImage({ imageFile, setImageFile }: UploadImageProps) {
+function UploadImage({
+  imageFile,
+  setImageFile,
+  giftInputError,
+}: UploadImageProps) {
   return (
     <>
       {imageFile ? (
-        <div className="w-full h-[350px] flex justify-center items-center">
+        <div className="w-full h-full flex justify-center items-center">
           <img
             src={URL.createObjectURL(imageFile)}
             alt="Preview"
@@ -1264,7 +1424,7 @@ function UploadImage({ imageFile, setImageFile }: UploadImageProps) {
       ) : (
         <label
           htmlFor="image-upload"
-          className="relative flex h-[300px] w-full mx-auto justify-center items-center rounded-3xl cursor-pointer bg-custom-gradient-1 overflow-hidden transition-colors duration-150 group"
+          className={`${giftInputError === GiftInputError.gift_image && "shaky"} relative flex h-[300px] w-full mx-auto justify-center items-center rounded-3xl cursor-pointer bg-custom-gradient-1 overflow-hidden transition-colors duration-150 group`}
           onDragOver={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1307,10 +1467,14 @@ function UploadImage({ imageFile, setImageFile }: UploadImageProps) {
 }
 
 function LoadingStagesModal({
+  imageFile,
+  createGiftData,
   giftCreationStage,
   open,
   onOpenChange,
 }: {
+  imageFile: File | null;
+  createGiftData: CreateGiftData;
   giftCreationStage: GiftCreationStage[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -1332,10 +1496,15 @@ function LoadingStagesModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md [&>button]:hidden rounded-[24px] p-6">
-        <DialogHeader className="flex flex-row items-center justify-between">
+      <DialogContent className="sm:max-w-md [&>button]:hidden rounded-[24px]">
+        <DialogHeader className="flex flex-row items-center justify-between px-7 pt-7">
           <DialogTitle className="text-base text-left">
-            Creating Gift
+            {stageLabels.every(({ stage }) => {
+              const s = getStageInfo(stage);
+              return s && s.status === GiftCreationStatus.Success;
+            })
+              ? "Gift created successfully"
+              : "Creating Gift"}
           </DialogTitle>
           <DialogPrimitive.Close asChild>
             <Button
@@ -1346,115 +1515,213 @@ function LoadingStagesModal({
             </Button>
           </DialogPrimitive.Close>
         </DialogHeader>
-        <div className="flex flex-col gap-3 items-start w-full">
-          {stageLabels.map(({ stage, label }) => {
-            const currentStageInfo = getStageInfo(stage);
-            const isLoading =
-              currentStageInfo?.status === GiftCreationStatus.Loading;
+        {stageLabels.every(({ stage }) => {
+          const s = getStageInfo(stage);
+          return s && s.status === GiftCreationStatus.Success;
+        }) ? (
+          <div className="flex flex-col items-center gap-4 px-7">
+            <div className="w-full h-auto rounded-2xl overflow-hidden shadow border border-gray-200 mb-1 bg-white flex items-center justify-center">
+              {imageFile ? (
+                <img
+                  src={URL.createObjectURL(imageFile)}
+                  alt={createGiftData.name}
+                  className="w-full max-h-[350px] object-cover"
+                />
+              ) : (
+                <div className="text-gray-300 flex items-center justify-center w-full h-full text-5xl">
+                  🎁
+                </div>
+              )}
+            </div>
 
-            // Style logic
-            let labelClasses = ["transition-colors", "duration-200"];
-            if (isLoading) {
-              // Opacity 100%, text-2xl, font-bold
-              labelClasses.push(
-                "text-xl",
-                "opacity-100",
-                "text-black",
-                "font-bold"
-              );
-            } else {
-              // All other: base, opacity-75, regular
-              labelClasses.push("text-sm", "text-black/50");
-            }
+            <div className="font-bold text-2xl text-black text-center">
+              {createGiftData.name}
+            </div>
+            <div className="flex flex-col w-full gap-2 mt-2">
+              <div className="flex flex-row items-center justify-between w-full text-black/90">
+                <div className="flex items-center">
+                  <Van className="w-5 h-5 mr-2" />
+                  <span>Delivery Date</span>
+                </div>
+                <span className="font-medium">
+                  {createGiftData.birthday
+                    ? new Date(createGiftData.birthday).toLocaleDateString(
+                        undefined,
+                        {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        }
+                      )
+                    : "--"}
+                </span>
+              </div>
+              <div className="flex flex-row items-center justify-between w-full text-black/90">
+                <div className="flex items-center">
+                  <DollarSign className="w-5 h-5 mr-2" />
+                  <span>Gift Amount</span>
+                </div>
+                <span className="font-medium">
+                  {createGiftData.giftAmount != null
+                    ? createGiftData.giftAmount.toLocaleString(undefined, {
+                        minimumFractionDigits: 3,
+                        maximumFractionDigits: 3,
+                      }) + " SOL"
+                    : "--"}
+                </span>
+              </div>
+              <div className="flex flex-row items-center justify-between w-full text-black/90">
+                <div className="flex items-center">
+                  <Van className="w-5 h-5 mr-2" />
+                  <span>Recipient Email</span>
+                </div>
+                <span className="font-medium break-all text-right max-w-[150px]">
+                  {createGiftData.email ? createGiftData.email : "--"}
+                </span>
+              </div>
+              {(() => {
+                // Use the helper function getStageInfo for consistency
+                const signatureStage = getStageInfo(
+                  CreateGiftStage.GiftCreatedSuccessfully
+                );
+                const signature =
+                  signatureStage?.status === GiftCreationStatus.Success
+                    ? signatureStage.info
+                    : undefined;
 
-            const isCompleted =
-              currentStageInfo?.status === GiftCreationStatus.Success;
-            const notStarted = !currentStageInfo;
-            const isError =
-              currentStageInfo?.status === GiftCreationStatus.Error;
+                if (!signature) return null;
 
-            return (
-              <div className="flex items-center gap-2.5" key={stage}>
-                {/* Icon */}
-                {isLoading ? (
-                  // Show independent spinner when loading
-                  <span
-                    className="flex items-center justify-center"
-                    style={{ minWidth: "1.25rem", minHeight: "1.25rem" }}
+                return (
+                  <Link
+                    href={`https://solscan.io/tx/${signature}?cluster=devnet`}
+                    target="_blank"
+                    className="flex flex-row items-center justify-between w-full text-black/90"
                   >
-                    <svg
-                      className="animate-spin h-5 w-5 text-gray-500"
-                      fill="none"
-                      viewBox="0 0 16 16"
+                    <div className="flex items-center">
+                      <Check className="w-5 h-5 mr-2" />
+                      <span>Verify on Solscan</span>
+                    </div>
+                    <span className="font-medium break-all text-right max-w-[150px] text-violet-800">
+                      {`${signature.slice(0, 4)}...${signature.slice(-4)}`}
+                    </span>
+                  </Link>
+                );
+              })()}
+
+              <Link
+                href="/dashboard"
+                className="flex flex-row py-5 items-center justify-center w-full text-blue-600 border-t border-solid border-neutral-500 hover:text-blue-500 transition-colors duration-100 cursor-pointer"
+              >
+                View on Dashboard
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3 items-start w-full px-7 pb-7">
+            {stageLabels.map(({ stage, label }) => {
+              const currentStageInfo = getStageInfo(stage);
+              const isLoading =
+                currentStageInfo?.status === GiftCreationStatus.Loading;
+
+              // Style logic
+              let labelClasses = ["transition-colors", "duration-200"];
+              if (isLoading) {
+                // Opacity 100%, text-2xl, font-bold
+                labelClasses.push("opacity-100", "text-black", "font-bold");
+              } else {
+                // All other: base, opacity-75, regular
+                labelClasses.push("text-sm", "text-black/50");
+              }
+
+              const isCompleted =
+                currentStageInfo?.status === GiftCreationStatus.Success;
+              const notStarted = !currentStageInfo;
+              const isError =
+                currentStageInfo?.status === GiftCreationStatus.Error;
+
+              return (
+                <div className="flex items-center gap-2.5" key={stage}>
+                  {/* Icon */}
+                  {isLoading ? (
+                    // Show independent spinner when loading
+                    <span
+                      className="flex items-center justify-center"
+                      style={{ minWidth: "1.25rem", minHeight: "1.25rem" }}
                     >
-                      <circle
-                        cx="8"
-                        cy="8"
-                        r="6"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        opacity="0.25"
-                      />
-                      <path
-                        d="M14 8a6 6 0 00-6-6"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </span>
-                ) : (
-                  <span
-                    className={[
-                      "flex items-center justify-center h-5 w-5 rounded-full border-2 border-solid transition-all duration-200",
-                      isCompleted
-                        ? "bg-green-700 border-green-700"
-                        : notStarted
-                          ? "bg-neutral-200 border-neutral-200"
-                          : isError
-                            ? "bg-red-500 border-red-500"
-                            : "bg-gray-100 border-gray-100",
-                    ].join(" ")}
-                    style={{ minWidth: "1.25rem", minHeight: "1.25rem" }}
-                  >
-                    {isCompleted ? (
-                      // Deep green background, white tick
                       <svg
-                        className="h-3 w-3 text-white"
+                        className="animate-spin h-5 w-5 text-gray-500"
                         fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
                         viewBox="0 0 16 16"
                       >
-                        <path
-                          d="M4 8.5l3 3 5-5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
+                        <circle
+                          cx="8"
+                          cy="8"
+                          r="6"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          opacity="0.25"
                         />
-                      </svg>
-                    ) : isError ? (
-                      // Red background, white X
-                      <svg
-                        className="h-3 w-3 text-white"
-                        fill="none"
-                        viewBox="0 0 16 16"
-                      >
                         <path
-                          d="M4.7 4.7l6.6 6.6M4.7 11.3l6.6-6.6"
+                          d="M14 8a6 6 0 00-6-6"
                           stroke="currentColor"
                           strokeWidth="2"
                           strokeLinecap="round"
                         />
                       </svg>
-                    ) : null}
-                  </span>
-                )}
-                {/* Stage Name */}
-                <span className={labelClasses.join(" ")}>{label}</span>
-              </div>
-            );
-          })}
-        </div>
+                    </span>
+                  ) : (
+                    <span
+                      className={[
+                        "flex items-center justify-center h-5 w-5 rounded-full border-2 border-solid transition-all duration-200",
+                        isCompleted
+                          ? "bg-green-700 border-green-700"
+                          : notStarted
+                            ? "bg-neutral-200 border-neutral-200"
+                            : isError
+                              ? "bg-red-500 border-red-500"
+                              : "bg-gray-100 border-gray-100",
+                      ].join(" ")}
+                      style={{ minWidth: "1.25rem", minHeight: "1.25rem" }}
+                    >
+                      {isCompleted ? (
+                        // Deep green background, white tick
+                        <svg
+                          className="h-3 w-3 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          viewBox="0 0 16 16"
+                        >
+                          <path
+                            d="M4 8.5l3 3 5-5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      ) : isError ? (
+                        // Red background, white X
+                        <svg
+                          className="h-3 w-3 text-white"
+                          fill="none"
+                          viewBox="0 0 16 16"
+                        >
+                          <path
+                            d="M4.7 4.7l6.6 6.6M4.7 11.3l6.6-6.6"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      ) : null}
+                    </span>
+                  )}
+                  {/* Stage Name */}
+                  <span className={labelClasses.join(" ")}>{label}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
         {firstError && (
           <div className="rounded-xl mt-2 p-3 text-xs border border-red-200 bg-red-50 text-black">
             {firstError.errorMessage}

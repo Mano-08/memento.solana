@@ -32,7 +32,7 @@ pub enum GiftError {
     InvalidSalt,
     #[msg("Not an NFT")]
     NotAnNFT,
-    #[msg("NFT mint authority not revoked")]
+    #[msg("Mint authority must be None or delegated to master edition")]
     MintAuthorityNotRevoked,
     #[msg("Gift in locked state, will open on delivery date!")]
     GiftNotReadyYet,
