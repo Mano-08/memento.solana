@@ -202,7 +202,7 @@ const Gifts = () => {
         </Tabs.Trigger>
       </Tabs.List>
       <Tabs.Content
-        className="grow rounded-b-md bg-white py-5 md:p-5 outline-none focus:shadow-black"
+        className="grow rounded-b-md bg-white py-5 sm:p-5 outline-none focus:shadow-black"
         value="sent"
       >
         <div className="columns-1 lg:columns-2 column-gap:[20px] min-h-screen">
@@ -212,7 +212,7 @@ const Gifts = () => {
         </div>
       </Tabs.Content>
       <Tabs.Content
-        className="grow rounded-b-md bg-white py-5 md:p-5 outline-none focus:shadow-black"
+        className="grow rounded-b-md bg-white py-5 sm:p-5 outline-none focus:shadow-black"
         value="received"
       >
         <div className="columns-1 lg:columns-2 column-gap:[20px] min-h-screen">
@@ -274,7 +274,7 @@ function GiftCard({
         </span>
       </div>
       <div className="flex flex-col gap-0.5 mt-2">
-        <div className="flex flex-row items-center justify-between w-full text-black/90 text-xs md:text-sm">
+        <div className="flex flex-row items-center justify-between w-full text-black/90 text-xs sm:text-sm">
           <span className="flex items-center gap-1">
             <Calendar className="mr-1 w-4 h-4" />
             Created On
@@ -283,7 +283,7 @@ function GiftCard({
             {formatDate(gift.giftData.createdOn)}
           </span>
         </div>
-        <div className="flex flex-row items-center justify-between w-full text-black/90 text-xs md:text-sm">
+        <div className="flex flex-row items-center justify-between w-full text-black/90 text-xs sm:text-sm">
           <span className="flex items-center gap-1">
             <Van className="mr-1 w-4 h-4" />
             Delivery Date
@@ -292,7 +292,7 @@ function GiftCard({
             {formatDate(gift.giftData.deliveryDate)}
           </span>
         </div>
-        <div className="flex flex-row items-center justify-between w-full text-black/90 text-xs md:text-sm">
+        <div className="flex flex-row items-center justify-between w-full text-black/90 text-xs sm:text-sm">
           <span className="flex items-center gap-1">
             <DollarSign className="mr-1 w-4 h-4" />
             Gift Amount
@@ -309,7 +309,7 @@ function GiftCard({
           </span>
         </div>
         {gift.giftData.claimed && (
-          <div className="flex flex-row items-center justify-between w-full text-black/90 text-xs md:text-sm">
+          <div className="flex flex-row items-center justify-between w-full text-black/90 text-xs sm:text-sm">
             <span className="flex items-center gap-1">
               <UserRoundCheck className="mr-1 w-4 h-4" />
               {received ? "Sender" : "Recipient"}
@@ -322,7 +322,7 @@ function GiftCard({
           </div>
         )}
         {gift.giftData.claimed && (
-          <div className="flex flex-row items-center justify-between w-full text-black/90 text-xs md:text-sm">
+          <div className="flex flex-row items-center justify-between w-full text-black/90 text-xs sm:text-sm">
             <span className="flex items-center gap-1">
               <PackageCheck className="mr-1 w-4 h-4" />
               Claimed On

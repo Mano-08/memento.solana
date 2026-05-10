@@ -8,15 +8,7 @@ import {
   Gift,
 } from "@/app/generated/solgift";
 import { UiWalletAccount, useWallets } from "@wallet-standard/react";
-import {
-  ArrowRight,
-  Check,
-  DollarSign,
-  Mail,
-  Puzzle,
-  Van,
-  X,
-} from "lucide-react";
+import { ArrowRight, Check, DollarSign, Key, Mail, Puzzle } from "lucide-react";
 import { getAddMemoInstruction } from "@solana-program/memo";
 import { decryptQuestion, recursiveSha256 } from "@/app/helper/compute";
 
@@ -37,8 +29,14 @@ function InputOTPPattern({
   onChange: (value: string) => void;
 }) {
   return (
-    <Field className="w-fit">
-      <FieldLabel htmlFor="digits-only">Digits Only</FieldLabel>
+    <Field className="w-fit px-7 text-neutral-500">
+      <FieldLabel
+        htmlFor="digits-only"
+        className="flex flex-row items-center gap-2"
+      >
+        <Key size={16} />
+        Enter OTP
+      </FieldLabel>
       <InputOTP
         id="digits-only"
         maxLength={4}
@@ -46,7 +44,7 @@ function InputOTPPattern({
         value={value}
         onChange={onChange}
       >
-        <InputOTPGroup>
+        <InputOTPGroup className="text-neutral-800 font-semibold">
           <InputOTPSlot index={0} />
           <InputOTPSlot index={1} />
           <InputOTPSlot index={2} />
@@ -88,7 +86,7 @@ import {
 } from "@solana/kit";
 import { useWallets as privyUseWallets } from "@privy-io/react-auth/solana";
 import { useParams } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useConnector } from "@solana/connector/react";
 import {
   createAuthorizedRecipientSigner,
@@ -112,6 +110,9 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { signatureBytesToBase58 } from "@solana/connector";
 import CustomConfetti from "@/app/components/confetti";
 import { toast } from "sonner";
+import { Spinner } from "@/app/components/ui/spinner";
+import { sendOtpToEmailAddress } from "@/app/lib/nodemailer/mail";
+import { SparkleCluster } from "@/app/components/stars";
 
 const rpc = createSolanaRpc("https://api.devnet.solana.com");
 const rpcSubscriptions = createSolanaRpcSubscriptions(
@@ -143,26 +144,20 @@ export enum GiftClaimingStatus {
   Error = "error",
 }
 
-export type GiftClaimStage = {
+type GiftClaimStage = {
   info?: string;
   stage: GiftClaimStages;
   status: GiftClaimingStatus;
-  errorMessage: string;
+  errorMessage?: string;
 };
 
 // const SOLGIFT_PROGRAM_ADDRESS: Address = idl.address as Address;
 
 // This page pulls the gift_pda from the URL, then sets up React state hooks
 export default function Page() {
-  const [giftClaimStage, setGiftClaimStage] = useState<GiftClaimStage[]>([]);
+  const [giftClaimStages, setGiftClaimStages] = useState<GiftClaimStage[]>([]);
   const { ready, user, authenticated } = usePrivy();
-  const {
-    isConnected,
-    account,
-    connector,
-    walletConnectUri,
-    clearWalletConnectUri,
-  } = useConnector();
+  const { isConnected, account, connector } = useConnector();
 
   const connectedToExternalWallet = isConnected && account && connector;
   const connectedToEmbeddedWallet = ready && user && authenticated;
@@ -209,7 +204,6 @@ export default function Page() {
   const [email, setEmail] = useState<string>("");
   const [answer, setAnswer] = useState<string>("");
   const [decrypted, setDecrypted] = useState<string>("");
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [claimGiftError, setClaimGiftError] = useState<ClaimGiftErrors | null>(
     null
   );
@@ -261,12 +255,9 @@ export default function Page() {
     fetchData();
   }, [gift_pda]);
 
-  function handleSetRecipientEmail(e: React.ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value;
-    setEmail(value);
-  }
-
   async function claimGift(answer: string, signer: TransactionSigner<string>) {
+    setIsClaimingGift(true);
+    setGiftReceivedModalOpen(true);
     try {
       if (!(connectedToEmbeddedWallet || connectedToExternalWallet)) return;
       if (!gift) {
@@ -274,7 +265,7 @@ export default function Page() {
         throw new Error("Faield to fetch gift details.");
       }
 
-      setGiftClaimStage((prev) => {
+      setGiftClaimStages((prev) => {
         return [
           ...prev,
           {
@@ -302,7 +293,7 @@ export default function Page() {
 
       if (authorizedClaimerKeypair.address !== gift.data.authorizedClaimer) {
         toast.error("Unauthorized claimer");
-        setGiftClaimStage((prev) => {
+        setGiftClaimStages((prev) => {
           const idx = prev.findIndex(
             (s) => s.stage === GiftClaimStages.VerifyAnswer
           );
@@ -321,7 +312,7 @@ export default function Page() {
         });
         throw new Error("Incorrect answer");
       }
-      setGiftClaimStage((prev) => {
+      setGiftClaimStages((prev) => {
         const idx = prev.findIndex(
           (s) => s.stage === GiftClaimStages.VerifyAnswer
         );
@@ -493,7 +484,7 @@ export default function Page() {
           console.error("❌ Send failed:", err?.message);
           console.error("   Error code:", err?.context?.err);
 
-          setGiftClaimStage((prev) => {
+          setGiftClaimStages((prev) => {
             const idx = prev.findIndex(
               (s) => s.stage === GiftClaimStages.ClaimingGift
             );
@@ -534,7 +525,7 @@ export default function Page() {
         return sig;
       }
 
-      setGiftClaimStage((prev) => {
+      setGiftClaimStages((prev) => {
         return [
           ...prev,
           {
@@ -550,7 +541,7 @@ export default function Page() {
         payer: payer,
       });
 
-      setGiftClaimStage((prev) => {
+      setGiftClaimStages((prev) => {
         const idx = prev.findIndex(
           (s) => s.stage === GiftClaimStages.ClaimingGift
         );
@@ -567,8 +558,6 @@ export default function Page() {
         // If not found, just return prev unchanged (or you may choose to push, but per instruction do not)
         return prev;
       });
-
-      setGiftReceivedModalOpen(true);
 
       await claimRentAuthorizedClaimer({
         nftMint,
@@ -653,6 +642,8 @@ export default function Page() {
       }
       // Log error for debug
       console.error("claimGift error", err);
+    } finally {
+      setIsClaimingGift(false);
     }
   }
 
@@ -662,7 +653,6 @@ export default function Page() {
   ) {
     e.preventDefault();
     if (!(connectedToEmbeddedWallet || connectedToExternalWallet)) {
-      setIsModalOpen(true);
       return;
     }
     // const answer = (e.target as any).answer.value;
@@ -753,18 +743,36 @@ export default function Page() {
     }
   }
 
-  const [emailVerified, setEmailVerified] = useState<boolean>(false);
+  const handleReceivedModalOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) {
+        // Only allow closing if any stage has status Error or all claim stages succeeded
+        const canClose =
+          giftClaimStages.some(
+            (stage) => stage.status === GiftClaimingStatus.Error
+          ) ||
+          (giftClaimStages.length > 0 &&
+            giftClaimStages.every(
+              (stage) => stage.status === GiftClaimingStatus.Success
+            ));
 
+        if (canClose) {
+          setGiftReceivedModalOpen(open);
+          setGiftClaimStages([]);
+        }
+      }
+    },
+    [giftClaimStages]
+  );
+
+  const [emailVerified, setEmailVerified] = useState<boolean>(false);
+  const [isClaimingGift, setIsClaimingGift] = useState<boolean>(false);
   return (
     <main
       className={`antialiased bg-custom-landing min-h-screen flex items-center justify-between py-20 px-6 w-screen overflow-x-hidden`}
     >
       <Modal closeGiftErrorModal={closeGiftErrorModal} error={claimGiftError} />
-      {/* <GiftClaimedModal
-        open={giftReceivedModalOpen}
-        onOpenChange={(open: boolean) => setGiftReceivedModalOpen(open)}
-        claimedGift={giftClaimed}
-      /> */}
+
       {gift && (
         <EmailOTPModal
           decrypted={decrypted}
@@ -773,25 +781,22 @@ export default function Page() {
           email={email}
           salt={gift.data.salt}
           gift_pda={gift.address}
-          handleSetRecipientEmail={handleSetRecipientEmail}
+          setEmail={setEmail}
           setEmailVerified={setEmailVerified}
         />
       )}
       <LoadingClaimStagesModal
-        giftClaimStage={giftClaimStage}
+        giftClaimStages={giftClaimStages}
         giftClaimed={giftClaimed}
-        open={giftClaimStage.length !== 0}
-        onOpenChange={function (open: boolean): void {
-          throw new Error("Function not implemented.");
-        }}
+        open={giftReceivedModalOpen}
+        onOpenChange={handleReceivedModalOpenChange}
       />
-
       <form
         onSubmit={(e) => e.preventDefault()}
-        className="md:max-w-xl mx-auto flex gap-6 md:w-auto w-full flex-col items-center"
+        className="sm:max-w-xl mx-auto flex gap-6 sm:w-auto w-full flex-col items-center"
       >
         <div
-          className={`md:min-w-[400px] w-full flex flex-col gap-4 animate-slideUp delay-200! ${
+          className={`sm:min-w-[400px] w-full flex flex-col gap-4 animate-slideUp delay-200! ${
             !decrypted ? "opacity-30 cursor-not-allowed rounded-lg" : ""
           }`}
           style={{ pointerEvents: "auto" }}
@@ -803,7 +808,7 @@ export default function Page() {
           }}
         >
           <fieldset
-            className={`flex w-full font-semibold text-sm flex-col gap-2 justify-between items-start rounded-lg transition-transform duration-400 groupfocus-within:scale-105 bg-white p-3 md:focus-within:scale-110 md:focus-within:rounded-2xl md:focus-within:p-4`}
+            className={`flex w-full font-semibold text-sm flex-col gap-2 justify-between items-start rounded-[20px] transition-transform duration-400 groupfocus-within:scale-105 bg-white p-4 sm:focus-within:scale-110 sm:focus-within:rounded-2xl sm:focus-within:p-4`}
           >
             <label
               className="flex flex-row items-center gap-2 text-neutral-700 leading-none"
@@ -831,11 +836,13 @@ export default function Page() {
           {wallet ? (
             <ClaimGiftWithEmbeddedWallet
               wallet={wallet}
+              isClaimingGift={isClaimingGift}
               handleClaimGift={handleClaimGift}
               incorrectEmail={incorrectEmail}
             />
           ) : uiWalletAccount ? (
             <ClaimGiftWithExternalWallet
+              isClaimingGift={isClaimingGift}
               uiWalletAccount={uiWalletAccount}
               handleClaimGift={handleClaimGift}
               incorrectEmail={incorrectEmail}
@@ -906,7 +913,7 @@ function Modal({
             {description}
           </DialogDescription>
         </div>
-        <div className="border-t border-black/10">
+        <div className="border-t border-solid border-neutral-400">
           {error === ClaimGiftErrors.INVALID_GIFT_ID ||
           error === ClaimGiftErrors.GIFT_DOESNT_EXIST ? (
             <Link
@@ -935,11 +942,13 @@ type ClaimGiftWithExternalWalletProps = {
     signer: TransactionSigner<string>
   ) => void;
   incorrectEmail: boolean;
+  isClaimingGift: boolean;
 };
 
 function ClaimGiftWithExternalWallet({
   uiWalletAccount,
   incorrectEmail,
+  isClaimingGift,
   handleClaimGift,
 }: ClaimGiftWithExternalWalletProps) {
   const signer = useWalletAccountTransactionSigner(
@@ -950,6 +959,7 @@ function ClaimGiftWithExternalWallet({
   return (
     <ClaimGiftButton
       signer={signer}
+      isClaimingGift={isClaimingGift}
       handleClaimGift={handleClaimGift}
       incorrectEmail={incorrectEmail}
     />
@@ -963,17 +973,20 @@ type ClaimGiftWithEmbeddedWalletProps = {
     signer: TransactionSigner<string>
   ) => void;
   incorrectEmail: boolean;
+  isClaimingGift: boolean;
 };
 
 function ClaimGiftWithEmbeddedWallet({
   wallet,
   handleClaimGift,
+  isClaimingGift,
   incorrectEmail,
 }: ClaimGiftWithEmbeddedWalletProps) {
   const signer = createPrivySigner(wallet);
   return (
     <ClaimGiftButton
       signer={signer}
+      isClaimingGift={isClaimingGift}
       handleClaimGift={handleClaimGift}
       incorrectEmail={incorrectEmail}
     />
@@ -987,31 +1000,35 @@ type ClaimGiftButtonProps = {
     signer: TransactionSigner<string>
   ) => void;
   incorrectEmail: boolean;
+  isClaimingGift: boolean;
 };
 
 function ClaimGiftButton({
   signer,
   handleClaimGift,
+  isClaimingGift,
   incorrectEmail,
 }: ClaimGiftButtonProps) {
   return (
     <Button
       type="submit"
       onClick={(e) => handleClaimGift(e, signer)}
-      disabled={incorrectEmail}
+      disabled={incorrectEmail || isClaimingGift}
       variant={"default"}
       className="font-semibold cursor-pointer text-black  my-2 px-3 py-2 text-sm rounded-lg w-full bg-lime-400 hover:bg-lime-400/90"
     >
       <span
         className="
-          inline-block
+          inline-flex
+          flex-row items-center justify-center gap-2
           transition-transform
           duration-200
           ease-in-out
           group-hover:-translate-x-1
         "
       >
-        Claim Gift!
+        <SparkleCluster />
+        {isClaimingGift && <Spinner />} Claim Gift!
       </span>
       <span
         className="
@@ -1044,7 +1061,7 @@ function EmailOTPModal({
   open,
   cipher,
   email,
-  handleSetRecipientEmail,
+  setEmail,
   setEmailVerified,
   salt,
   gift_pda,
@@ -1056,8 +1073,11 @@ function EmailOTPModal({
   salt: ReadonlyUint8Array<ArrayBufferLike>;
   gift_pda: Address<string>;
   setEmailVerified: React.Dispatch<React.SetStateAction<boolean>>;
-  handleSetRecipientEmail: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  setEmail: React.Dispatch<React.SetStateAction<string>>;
 }) {
+  const [isVerifyingOTP, setIsVerifyingOTP] = useState<boolean>(false);
+  const [isSendingOTPViaEmail, setIsSendingOTPViaEmail] =
+    useState<boolean>(false);
   const [otpVerificationStatus, setOtpVerificationStatus] =
     useState<OtpRequestStatus>(OtpRequestStatus.IDLE);
   const [otpRequested, setOtpRequested] = useState(false);
@@ -1102,8 +1122,8 @@ function EmailOTPModal({
 
   async function requestOTP() {
     if (!decrypted) return;
+    setIsSendingOTPViaEmail(true);
     try {
-      // Here sample: adjust params as needed
       try {
         const s = await decryptQuestion(cipher, new Uint8Array(salt), email);
         console.log("FFI", s);
@@ -1127,16 +1147,19 @@ function EmailOTPModal({
       setOtpVerificationStatus(OtpRequestStatus.FAILED_TO_SEND_OTP);
       setOtpRequested(false);
       console.error(error);
+    } finally {
+      setIsSendingOTPViaEmail(false);
     }
   }
 
-  async function verifyOtp() {
-    if (!/^\d{4}$/.test(otpEntered)) {
-      setOtpVerificationStatus(OtpRequestStatus.INVALID_OTP_TYPE);
-      console.error("OTP must be a 4-digit numeric value (0000-9999).");
-      return;
-    }
+  async function verifyOtp(otpEntered: string) {
     try {
+      setIsVerifyingOTP(true);
+      if (!/^\d{4}$/.test(otpEntered)) {
+        setOtpVerificationStatus(OtpRequestStatus.INVALID_OTP_TYPE);
+        console.error("OTP must be a 4-digit numeric value (0000-9999).");
+        return;
+      }
       const response = await fetch("/api/v1/otp/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1147,6 +1170,7 @@ function EmailOTPModal({
       });
       if (response.ok) {
         setOtpVerificationStatus(OtpRequestStatus.OTP_VERIFIED);
+        setEmailVerified(true);
       } else if (response.status === 410) {
         setOtpVerificationStatus(OtpRequestStatus.OTP_DID_NOT_MATCH);
       } else {
@@ -1156,6 +1180,8 @@ function EmailOTPModal({
     } catch (error) {
       setOtpVerificationStatus(OtpRequestStatus.FAILED_TO_VERIFY_OTP);
       console.error(error);
+    } finally {
+      setIsVerifyingOTP(false);
     }
   }
 
@@ -1170,36 +1196,50 @@ function EmailOTPModal({
           </DialogTitle>
         </DialogHeader>
 
-        <fieldset className="flex w-full font-semibold text-sm flex-col gap-2 justify-between items-start">
+        <fieldset
+          className={`flex w-full font-semibold text-sm flex-col gap-2 justify-between items-start px-7 ${decrypted === "" && "pb-7"}`}
+        >
           <label
-            className="flex flex-row items-center gap-2 text-neutral-700 leading-none"
+            className="flex flex-row items-center gap-2 text-neutral-500 leading-none"
             htmlFor="email"
           >
             <Mail size={16} /> Email
           </label>
           <div className="w-full rounded-lg bg-white">
             <input
-              className="rounded-lg w-full shrink-0 text-left px-1.5 grow border-none text-sm py-2 leading-none text-neutral-800 outline-none bg-transparent"
+              className={`
+                ${otpRequested && "cursor-default"}
+                rounded-lg w-full shrink-0 text-left px-1.5 grow border text-sm py-2 leading-none text-neutral-800 bg-transparent
+                border-neutral-300
+                focus:outline-none focus:ring-2 focus:ring-neutral-200 focus:border-neutral-200
+                transition
+              `}
               id="email"
               type="email"
               value={email}
-              onChange={handleSetRecipientEmail}
+              onChange={(e) => {
+                if (otpRequested || isSendingOTPViaEmail) return;
+                setEmail(e.target.value);
+              }}
               placeholder="mark@gmail.com"
               name="email"
             />
           </div>
         </fieldset>
-        {decrypted && (
+        {otpRequested && (
           <InputOTPPattern
             value={otpEntered}
             onChange={function (value: string): void {
               setOtpEntered(value);
+              if (value.length === 4) {
+                verifyOtp(value);
+              }
             }}
           />
         )}
         {statusBox && (
           <div
-            className={`w-full mt-4 px-3 py-2 rounded-md border text-sm ${
+            className={`mt-2 mx-7 px-3 py-2 rounded-md border text-sm ${
               statusBox.isError
                 ? "border-red-300 bg-red-50 text-red-700"
                 : "border-lime-300 bg-lime-50 text-lime-800"
@@ -1209,25 +1249,29 @@ function EmailOTPModal({
             {statusBox.message}
           </div>
         )}
+
         {decrypted !== "" && (
-          <div className="w-full flex justify-end mt-4">
+          <div className="w-full flex justify-end mt-2">
             {!otpRequested ? (
               <button
                 type="button"
-                className="px-4 py-2 rounded-md bg-lime-400 hover:bg-lime-400/90 font-semibold text-black text-sm"
+                className="py-5 w-full disabled:cursor-not-allowed disabled:text-blue-300 text-blue-600 hover:text-blue-500 font-semibold cursor-pointer border-t border-solid border-neutral-400 text-sm flex flex-row items-center justify-center gap-2"
                 onClick={requestOTP}
+                disabled={isSendingOTPViaEmail}
               >
+                {isSendingOTPViaEmail && <Spinner />}
                 Request OTP
               </button>
             ) : (
               <button
                 type="button"
-                className="px-4 py-2 rounded-md bg-lime-400 hover:bg-lime-400/90 font-semibold text-black text-sm"
-                // For demo, this just focuses the next step; you should wire in a prompt for user to enter OTP, etc.
+                disabled={isVerifyingOTP}
+                className="py-5 w-full disabled:cursor-not-allowed disabled:text-blue-300 text-blue-600 hover:text-blue-500 font-semibold cursor-pointer border-t border-solid border-neutral-400 text-sm flex flex-row items-center justify-center gap-2"
                 onClick={() => {
-                  verifyOtp();
+                  verifyOtp(otpEntered);
                 }}
               >
+                {isVerifyingOTP && <Spinner />}
                 Verify OTP
               </button>
             )}
@@ -1238,188 +1282,41 @@ function EmailOTPModal({
   );
 }
 
-// function GiftClaimedModal({
-//   open,
-//   onOpenChange,
-//   claimedGift,
-// }: {
-//   open: boolean;
-//   onOpenChange: (open: boolean) => void;
-//   claimedGift: {
-//     gift: Account<Gift, string>;
-//     nft: { name: string; image: string };
-//     signature: string;
-//   } | null;
-// }) {
-//   if (!claimedGift) return;
-//   // // ---- Testing only: inject random claimedGift ----
-//   // // Comment this out to restore production!
-//   // const fakeClaimedGift = {
-//   //   gift: {
-//   //     data: {
-//   //       solAmount: BigInt(Math.floor(Math.random() * 30 + 1) * 1e9), // random 1 ~ 30 SOL
-//   //       deliveryDate: BigInt(
-//   //         Math.floor(Date.now() / 1000) +
-//   //           3600 * 24 * Math.floor(Math.random() * 5)
-//   //       ), // random next 5 days
-//   //     },
-//   //   },
-//   //   nft: {
-//   //     name: `NFT #${Math.floor(Math.random() * 10000)}`,
-//   //     image:
-//   //       "https://picsum.photos/400/300?random=" +
-//   //       Math.floor(Math.random() * 1000),
-//   //   },
-//   //   signature: Math.random().toString(36).slice(2, 18),
-//   // };
-//   // const activeClaimedGift = fakeClaimedGift;
-//   const activeClaimedGift = claimedGift; // <-- use this for production!
-
-//   const gift = activeClaimedGift.gift;
-//   const signature = activeClaimedGift.signature;
-//   const nft = activeClaimedGift.nft;
-
-//   function formatSolAmount(amount: bigint): string {
-//     return (
-//       (Number(amount) / 1e9).toLocaleString(undefined, {
-//         minimumFractionDigits: 3,
-//         maximumFractionDigits: 3,
-//       }) + " SOL"
-//     );
-//   }
-
-//   function formatDate(bn: bigint) {
-//     if (!bn || bn === BigInt(0)) return "--";
-//     return new Date(Number(bn) * 1000).toLocaleDateString(undefined, {
-//       month: "short",
-//       day: "numeric",
-//       year: "numeric",
-//     });
-//   }
-
-//   const giftImage = nft.image;
-//   const giftName = nft.name;
-//   const solAmount =
-//     gift.data && gift.data.solAmount
-//       ? formatSolAmount(gift.data.solAmount)
-//       : "--";
-//   const deliveryDate =
-//     gift.data && gift.data.deliveryDate
-//       ? formatDate(gift.data.deliveryDate)
-//       : "--";
-
-//   return (
-//     <Dialog open={open} onOpenChange={onOpenChange}>
-//       <CustomConfetti />
-//       <DialogContent className="sm:max-w-md [&>button]:hidden rounded-[24px]">
-//         <DialogHeader className="flex flex-row items-center justify-between px-7 pt-7">
-//           <DialogTitle className="text-base text-left">
-//             Gift claimed successfully!
-//           </DialogTitle>
-//           <DialogPrimitive.Close asChild>
-//             <Button
-//               variant="outline"
-//               className="rounded-[16px] size-8 p-2 shrink-0 cursor-pointer"
-//             >
-//               <IconXmark className="size-3" />
-//             </Button>
-//           </DialogPrimitive.Close>
-//         </DialogHeader>
-
-//         <div className="flex flex-col items-center gap-4 px-7">
-//           <div className="w-full h-auto rounded-2xl overflow-hidden shadow border border-gray-200 mb-1 bg-white flex items-center justify-center">
-//             {giftImage ? (
-//               <img
-//                 src={giftImage}
-//                 alt={giftName}
-//                 className="w-full max-h-[350px] object-cover"
-//               />
-//             ) : (
-//               <div className="text-gray-300 flex items-center justify-center w-full h-full text-5xl">
-//                 🎁
-//               </div>
-//             )}
-//           </div>
-
-//           <div className="font-bold text-2xl text-black text-center">
-//             {giftName}
-//           </div>
-//           <div className="flex flex-col w-full gap-2 mt-2">
-//             <div className="flex flex-row items-center justify-between w-full text-black/90">
-//               <div className="flex items-center">
-//                 <Van className="w-5 h-5 mr-2" />
-//                 <span>Delivery Date</span>
-//               </div>
-//               <span className="font-medium">{deliveryDate}</span>
-//             </div>
-//             <div className="flex flex-row items-center justify-between w-full text-black/90">
-//               <div className="flex items-center">
-//                 <DollarSign className="w-5 h-5 mr-2" />
-//                 <span>Gift Amount</span>
-//               </div>
-//               <span className="font-medium">{solAmount}</span>
-//             </div>
-
-//             <Link
-//               href={`https://solscan.io/tx/${signature}?cluster=devnet`}
-//               target="_blank"
-//               className="flex flex-row items-center justify-between w-full text-black/90"
-//             >
-//               <div className="flex items-center">
-//                 <Check className="w-5 h-5 mr-2" />
-//                 <span>View Transaction</span>
-//               </div>
-//               <span className="font-medium break-all text-right max-w-[150px] text-violet-800">
-//                 {`${signature.slice(0, 4)}...${signature.slice(-4)}`}
-//               </span>
-//             </Link>
-
-//             <Link
-//               href="/dashboard"
-//               className="flex flex-row py-5 items-center justify-center w-full text-blue-600 border-t border-solid border-neutral-500 hover:text-blue-500 transition-colors duration-100 cursor-pointer"
-//             >
-//               View on Dashboard
-//             </Link>
-//           </div>
-//         </div>
-//       </DialogContent>
-//     </Dialog>
-//   );
-// }
-
 interface LoadingClaimStagesModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   giftClaimed: GiftClaimedResponse;
-  giftClaimStage: GiftClaimStage[];
+  giftClaimStages: GiftClaimStage[];
 }
 
 function LoadingClaimStagesModal({
   open,
   onOpenChange,
   giftClaimed,
-  giftClaimStage,
+  giftClaimStages,
 }: LoadingClaimStagesModalProps) {
-  if (!giftClaimed) return null;
-
   const stageLabels: { stage: GiftClaimStages; label: string }[] = [
     { stage: GiftClaimStages.VerifyAnswer, label: "Verifying Answer" },
     { stage: GiftClaimStages.ClaimingGift, label: "Claiming Gift" },
   ];
 
-  function getStageInfo(stage: GiftClaimStages | string) {
-    return giftClaimStage.find((s) => s.stage === stage);
+  function getStageInfo(stage: GiftClaimStages): GiftClaimStage | undefined {
+    return giftClaimStages.find((s) => s.stage === stage);
   }
 
-  const firstError = giftClaimStage.find(
+  const firstError = giftClaimStages.find(
     (s) => s.status === GiftClaimingStatus.Error && s.errorMessage
   );
 
-  const isGiftClaimed = stageLabels.every(({ stage }) => {
-    const s = getStageInfo(stage);
-    return s && s.status === GiftClaimingStatus.Success;
-  });
+  // ✅ Guard: only true when ALL stages explicitly succeeded
+  const isGiftClaimed =
+    giftClaimStages.length > 0 &&
+    stageLabels.every(({ stage }) => {
+      const s = getStageInfo(stage);
+      return s && s.status === GiftClaimingStatus.Success;
+    });
 
+  // ... display helpers unchanged ...
   function displayDeliveryDate(val: any) {
     if (!val) return "--";
     let numVal: number | undefined = undefined;
@@ -1448,18 +1345,6 @@ function LoadingClaimStagesModal({
     );
   }
 
-  const gift = giftClaimed.gift.data;
-  const nftMetadata = giftClaimed.nft;
-  const deliveryDate = gift.deliveryDate ?? "--";
-  const solAmount = gift.solAmount ?? "--";
-  const name = nftMetadata.name;
-  const image = nftMetadata.image;
-  const recipientEmail = "--"; // No email in Gift, dummy
-  const sender = gift.sender ?? "--";
-  const signature = giftClaimed.signature;
-  const createdOn = gift.createdOn;
-  const claimedOn = gift.claimedOn;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {isGiftClaimed && <CustomConfetti />}
@@ -1477,67 +1362,43 @@ function LoadingClaimStagesModal({
             </Button>
           </DialogPrimitive.Close>
         </DialogHeader>
-        {isGiftClaimed ? (
+
+        {isGiftClaimed && giftClaimed ? (
           <>
             <div className="flex flex-col items-center gap-4 px-7">
               <div className="w-full h-auto rounded-2xl overflow-hidden shadow border border-gray-200 mb-1 bg-white flex items-center justify-center">
                 <div className="text-gray-300 flex items-center justify-center w-full h-full text-5xl">
-                  <img src={image} />
+                  <img src={giftClaimed.nft.image} />
                 </div>
               </div>
               <div className="font-bold text-2xl text-black text-center">
-                {name}
+                {giftClaimed.nft.name}
               </div>
               <div className="flex flex-col w-full gap-2 mt-2">
-                <div className="flex flex-row items-center justify-between w-full text-black/90">
-                  <div className="flex items-center">
-                    <Van className="w-5 h-5 mr-2" />
-                    <span>Delivery Date</span>
-                  </div>
-                  <span className="font-medium">
-                    {displayDeliveryDate(deliveryDate)}
-                  </span>
-                </div>
                 <div className="flex flex-row items-center justify-between w-full text-black/90">
                   <div className="flex items-center">
                     <DollarSign className="w-5 h-5 mr-2" />
                     <span>Gift Amount</span>
                   </div>
                   <span className="font-medium">
-                    {displaySolAmount(solAmount)}
+                    {displaySolAmount(giftClaimed.gift.data.solAmount)}
                   </span>
                 </div>
-                {/* Claim date (dummy for now) */}
                 <div className="flex flex-row items-center justify-between w-full text-black/90">
                   <div className="flex items-center">
                     <span className="inline-block w-5 h-5 mr-2" />
-                    <span>Claimed On</span>
+                    <span>createdOn On</span>
                   </div>
                   <span className="font-medium">
-                    {claimedOn ? displayDeliveryDate(claimedOn) : "--"}
+                    {giftClaimed.gift.data.createdOn
+                      ? displayDeliveryDate(giftClaimed.gift.data.createdOn)
+                      : "--"}
                   </span>
-                </div>
-                {/* Email not available, show dummy */}
-                <div className="flex flex-row items-center justify-between w-full text-black/90">
-                  <div className="flex items-center">
-                    <span className="inline-block w-5 h-5 mr-2" />
-                    <span>Recipient Email</span>
-                  </div>
-                  <span className="font-medium break-all text-right max-w-[150px]">
-                    {recipientEmail}
-                  </span>
-                </div>
-                {/* Index/ID */}
-                <div className="flex flex-row items-center justify-between w-full text-black/90">
-                  <div className="flex items-center">
-                    <span className="inline-block w-5 h-5 mr-2" />
-                    <span>Gift ID</span>
-                  </div>
                 </div>
 
-                {signature && (
+                {giftClaimed.signature && (
                   <Link
-                    href={`https://solscan.io/tx/${signature}?cluster=devnet`}
+                    href={`https://solscan.io/tx/${giftClaimed.signature}?cluster=devnet`}
                     target="_blank"
                     className="flex flex-row items-center justify-between w-full text-black/90"
                   >
@@ -1546,13 +1407,13 @@ function LoadingClaimStagesModal({
                       <span>Verify on Solscan</span>
                     </div>
                     <span className="font-medium break-all text-right max-w-[150px] text-violet-800">
-                      {`${signature.slice(0, 4)}...${signature.slice(-4)}`}
+                      {`${giftClaimed.signature.slice(0, 4)}...${giftClaimed.signature.slice(-4)}`}
                     </span>
                   </Link>
                 )}
                 <Link
                   href="/dashboard"
-                  className="flex flex-row py-5 items-center justify-center w-full text-blue-600 border-t border-solid border-neutral-500 hover:text-blue-500 transition-colors duration-100 cursor-pointer"
+                  className="flex flex-row py-5 items-center justify-center w-full text-blue-600 border-t border-solid border-neutral-400 hover:text-blue-500 transition-colors duration-100 cursor-pointer"
                 >
                   View on Dashboard
                 </Link>
@@ -1565,17 +1426,19 @@ function LoadingClaimStagesModal({
               const currentStageInfo = getStageInfo(stage);
               const isLoading =
                 currentStageInfo?.status === GiftClaimingStatus.Loading;
+              const isCompleted =
+                currentStageInfo?.status === GiftClaimingStatus.Success;
+              const isError =
+                currentStageInfo?.status === GiftClaimingStatus.Error;
+              const notStarted = !currentStageInfo;
+
               let labelClasses = ["transition-colors", "duration-200"];
               if (isLoading) {
                 labelClasses.push("opacity-100", "text-black", "font-bold");
               } else {
                 labelClasses.push("text-sm", "text-black/50");
               }
-              const isCompleted =
-                currentStageInfo?.status === GiftClaimingStatus.Success;
-              const notStarted = !currentStageInfo;
-              const isError =
-                currentStageInfo?.status === GiftClaimingStatus.Error;
+
               return (
                 <div className="flex items-center gap-2.5" key={stage}>
                   {isLoading ? (
@@ -1654,6 +1517,7 @@ function LoadingClaimStagesModal({
             })}
           </div>
         )}
+
         {firstError && (
           <div className="rounded-xl mt-2 p-3 mx-7 mb-7 text-xs border border-red-200 bg-red-50 text-black">
             {firstError.errorMessage}

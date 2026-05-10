@@ -185,7 +185,7 @@ function HowToCreateGiftDialog() {
             </li>
           </ol>
         </div>
-        <div className="border-t border-black/10 w-full">
+        <div className="border-t border-neutral-400 border-solid w-full">
           <DialogClose asChild>
             <button className="w-full cursor-pointer mx-auto text-blue-700 hover:text-blue-600 h-12 flex items-center justify-center font-medium transition-colors disabled:bg-muted/40 disabled:text-muted-foreground">
               Got it!

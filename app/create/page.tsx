@@ -121,6 +121,7 @@ import {
   SendGiftWithEmbeddedWalletProps,
   SendGiftWithExternalWalletProps,
 } from "../lib/types";
+import { Spinner } from "../components/ui/spinner";
 
 export default function CreateGiftForm() {
   const { ready, user, authenticated } = usePrivy();
@@ -293,10 +294,10 @@ export default function CreateGiftForm() {
     >
       <form
         onSubmit={(e) => e.preventDefault()}
-        className="max-w-5xl mx-auto flex md:flex-row flex-col justify-center items-start"
+        className="max-w-5xl mx-auto flex sm:flex-row flex-col justify-center items-start"
       >
         <div
-          className={`md:max-w-[30vw] flex flex-col gap-4 rounded-[44px] p-6 w-full`}
+          className={`sm:max-w-[30vw] flex flex-col gap-4 rounded-[44px] p-6 w-full`}
         >
           <UploadImage
             giftInputError={giftInputError}
@@ -1334,19 +1335,21 @@ function SendGift({
       />
       <Button
         type="submit"
+        disabled={giftCreationStage.length !== 0}
         variant={"default"}
         onClick={handleCreateGift}
         className="font-semibold w-full rounded-lg bg-white hover:bg-white/90 h-12 text-black group overflow-hidden relative"
       >
         <span
           className="
-            inline-block
+            inline-flex flex-row items-center gap-2
             transition-transform
             duration-200
             ease-in-out
             group-hover:-translate-x-1
           "
         >
+          {giftCreationStage.length !== 0 && <Spinner />}
           SEND GIFT!
         </span>
         <span
@@ -1576,7 +1579,7 @@ function LoadingStagesModal({
 
               <Link
                 href="/dashboard"
-                className="flex flex-row py-5 items-center justify-center w-full text-blue-600 border-t border-solid border-neutral-500 hover:text-blue-500 transition-colors duration-100 cursor-pointer"
+                className="flex flex-row py-5 items-center justify-center w-full text-blue-600 border-t border-solid border-neutral-400 hover:text-blue-500 transition-colors duration-100 cursor-pointer"
               >
                 View on Dashboard
               </Link>

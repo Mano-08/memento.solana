@@ -373,7 +373,7 @@ export function ConnectButton({
                 <Wallet className="h-3 w-3" />
               </AvatarFallback>
             </Avatar>
-            <span className="text-xs md:block hidden">{shortAddress}</span>
+            <span className="text-xs sm:block hidden">{shortAddress}</span>
             <motion.div
               animate={{ rotate: isDropdownOpen ? -180 : 0 }}
               transition={{ duration: 0.2, ease: "easeInOut" }}
