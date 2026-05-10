@@ -40,6 +40,7 @@ import {
 interface ConnectButtonProps {
   className?: string;
   text?: string;
+  disabled?: boolean;
 }
 
 /**
@@ -57,7 +58,11 @@ interface ConnectButtonProps {
  *
  * This prevents forcing the user to re-auth if they're already logged in.
  */
-export function ConnectButton({ className, text }: ConnectButtonProps) {
+export function ConnectButton({
+  className,
+  text,
+  disabled,
+}: ConnectButtonProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
@@ -129,38 +134,67 @@ export function ConnectButton({ className, text }: ConnectButtonProps) {
                     connection,
                     undefined
                   );
-                  const { error } = await supabase.auth.signInWithWeb3({
-                    chain: "solana",
-                    statement:
-                      "I accept the Terms of Service at https://example.com/tos",
-                    wallet: {
-                      publicKey: {
-                        toBase58: () => account,
-                      },
-                      signMessage: async (message: Uint8Array) => {
-                        if (!kitSigners || !kitSigners.messageSigner) {
-                          throw new Error("Wallet not ready for signing");
-                        }
-                        const signableMessage = createSignableMessage(message);
-                        const signedMessages =
-                          await kitSigners.messageSigner.modifyAndSignMessages([
-                            signableMessage,
-                          ]);
-                        const signatureMap = signedMessages[0].signatures;
-                        return signatureMap[account];
-                      },
-                    },
-                  });
+
+                  while (true) {
+                    const {
+                      data: { session: currentSession },
+                    } = await supabase.auth.getSession();
+
+                    if (currentSession) {
+                      break;
+                    }
+
+                    try {
+                      const { error } = await supabase.auth.signInWithWeb3({
+                        chain: "solana",
+                        statement:
+                          "I accept the Terms of Service at https://example.com/tos",
+                        wallet: {
+                          publicKey: {
+                            toBase58: () => account,
+                          },
+                          signMessage: async (message: Uint8Array) => {
+                            if (!kitSigners || !kitSigners.messageSigner) {
+                              throw new Error("Wallet not ready for signing");
+                            }
+                            const signableMessage =
+                              createSignableMessage(message);
+                            const signedMessages =
+                              await kitSigners.messageSigner.modifyAndSignMessages(
+                                [signableMessage]
+                              );
+                            const signatureMap = signedMessages[0].signatures;
+                            return signatureMap[account];
+                          },
+                        },
+                      });
+                      const {
+                        data: { session: newSession },
+                      } = await supabase.auth.getSession();
+
+                      if (newSession) {
+                        break;
+                      }
+
+                      if (error) {
+                        await new Promise((resolve) =>
+                          setTimeout(resolve, 1000)
+                        );
+                      }
+                    } catch (error) {
+                      // If wallet is disconnected or a different wallet is connected, exit the loop
+                      if (!account || account !== kitSigners.address) {
+                        break;
+                      }
+
+                      await new Promise((resolve) => setTimeout(resolve, 1000));
+                    }
+                  }
+                  setLoginPrompted(true);
                   await createUserAccountIfNotExist({
                     walletAddress: account,
                     supabase,
                   });
-                  if (error) {
-                    // Don't loop, just log error and don't reprompt unless wallet/account changes
-                    console.error("Error signing in with wallet:", error);
-                  } else {
-                    setLoginPrompted(true);
-                  }
                 }
               }
             }
@@ -202,11 +236,31 @@ export function ConnectButton({ className, text }: ConnectButtonProps) {
             );
 
             if (privyWallet) {
-              await signIntoSupabaseWithPrivy({
-                supabase,
-                wallet: privyWallet,
-                user,
-              });
+              // Repeatedly prompt until user signs in or operation succeeds,
+              // keeps checking auth status
+              while (true) {
+                const {
+                  data: { session: currentSession },
+                } = await supabase.auth.getSession();
+
+                if (currentSession) {
+                  break;
+                }
+
+                try {
+                  await signIntoSupabaseWithPrivy({
+                    supabase,
+                    wallet: privyWallet,
+                    user,
+                  });
+                  const {
+                    data: { session: newSession },
+                  } = await supabase.auth.getSession();
+                  if (newSession) break;
+                } catch (e) {
+                  await new Promise((resolve) => setTimeout(resolve, 1000));
+                }
+              }
               setLoginPrompted(true);
               return;
             }
@@ -251,15 +305,15 @@ export function ConnectButton({ className, text }: ConnectButtonProps) {
   const [protectedRoute, setProtectedRoute] = useState(false);
   const handleOnOpenChangeWallet = useCallback(
     (open: boolean) => {
-      if (
-        !connectedToExternalWallet &&
-        !connectedToEmbeddedWallet &&
-        isModalOpen &&
-        protectedRoute
-      ) {
-        setIsModalOpen(true);
-        return;
-      }
+      // if (
+      //   !connectedToExternalWallet &&
+      //   !connectedToEmbeddedWallet &&
+      //   isModalOpen &&
+      //   protectedRoute
+      // ) {
+      //   setIsModalOpen(true);
+      //   return;
+      // }
 
       setIsModalOpen(open);
       if (!open) {
@@ -267,12 +321,12 @@ export function ConnectButton({ className, text }: ConnectButtonProps) {
       }
     },
     [
-      connectedToExternalWallet,
-      connectedToEmbeddedWallet,
-      isModalOpen,
-      protectedRoute,
+      // connectedToExternalWallet,
+      // connectedToEmbeddedWallet,
+      // isModalOpen,
+      // protectedRoute,
       clearWalletConnectUri,
-      setIsModalOpen,
+      // setIsModalOpen,
     ]
   );
   useEffect(() => {
@@ -356,7 +410,14 @@ export function ConnectButton({ className, text }: ConnectButtonProps) {
 
     return (
       <>
-        <button onClick={() => setIsModalOpen(true)} className={className}>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className={cn(
+            disabled ? "cursor-not-allowed" : "cursor-pointer",
+            className
+          )}
+          disabled={disabled}
+        >
           {buttonContent}
         </button>
         <WalletModal

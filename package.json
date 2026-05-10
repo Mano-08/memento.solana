@@ -71,6 +71,7 @@
     "date-fns": "^4.1.0",
     "framer-motion": "^12.35.0",
     "fs": "0.0.1-security",
+    "input-otp": "^1.4.2",
     "jose": "^6.2.2",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.575.0",

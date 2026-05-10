@@ -1056,7 +1056,8 @@ body {
 }
 
 .bg-custom-gradient {
-  background: rgb(43, 38, 54);
+  /* background: rgb(43, 38, 54); */
+  background: rgb(3, 51, 34);
 }
 
 .shaky {

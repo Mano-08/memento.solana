@@ -14,56 +14,32 @@ import {
 } from "@solana/kit";
 import { SOLGIFT_PROGRAM_ADDRESS } from "../programs";
 
-/** InvalidReceiver: Receiver public key is invalid */
-export const SOLGIFT_ERROR__INVALID_RECEIVER = 0x1770; // 6000
-/** BelowMinimumAmount: Minimum 0.001 SOL required as gift amount */
-export const SOLGIFT_ERROR__BELOW_MINIMUM_AMOUNT = 0x1771; // 6001
-/** CannotGiftToSelf: Cannot gift to self */
-export const SOLGIFT_ERROR__CANNOT_GIFT_TO_SELF = 0x1772; // 6002
-/** CannotGiftToPast: Cannot gift to past */
-export const SOLGIFT_ERROR__CANNOT_GIFT_TO_PAST = 0x1773; // 6003
-/** DeliveryDateMustBeInFuture: Delivery date must be in future */
-export const SOLGIFT_ERROR__DELIVERY_DATE_MUST_BE_IN_FUTURE = 0x1774; // 6004
-/** InvalidAnswerHash: Invalid answer hash */
-export const SOLGIFT_ERROR__INVALID_ANSWER_HASH = 0x1775; // 6005
-/** InvalidSalt: Invalid salt */
-export const SOLGIFT_ERROR__INVALID_SALT = 0x1776; // 6006
-/** NotAnNFT: Not an NFT */
-export const SOLGIFT_ERROR__NOT_AN_N_F_T = 0x1777; // 6007
-/** MintAuthorityNotRevoked: NFT mint authority not revoked */
-export const SOLGIFT_ERROR__MINT_AUTHORITY_NOT_REVOKED = 0x1778; // 6008
-/** GiftNotReadyYet: Gift in locked state, will open on delivery date! */
-export const SOLGIFT_ERROR__GIFT_NOT_READY_YET = 0x1779; // 6009
-/** GiftPDADoesNotHaveNFT: Gift PDA does not own the NFT */
-export const SOLGIFT_ERROR__GIFT_P_D_A_DOES_NOT_HAVE_N_F_T = 0x177a; // 6010
+/** InvalidAnswer: Answer entered is incorrect */
+export const SOLGIFT_ERROR__INVALID_ANSWER = 0x1770; // 6000
+/** UnauthorizedClaimer: Claimer is not the same as approved recipient */
+export const SOLGIFT_ERROR__UNAUTHORIZED_CLAIMER = 0x1771; // 6001
+/** ClaimedAlready: Gift already claimed */
+export const SOLGIFT_ERROR__CLAIMED_ALREADY = 0x1772; // 6002
+/** IncorrectNFTMint: NFT mint address did not match the NFT mint in gift escrow */
+export const SOLGIFT_ERROR__INCORRECT_N_F_T_MINT = 0x1773; // 6003
+/** GiftATAEmpty: Gift ATA doesn't have the NFT */
+export const SOLGIFT_ERROR__GIFT_A_T_A_EMPTY = 0x1774; // 6004
 
 export type SolgiftError =
-  | typeof SOLGIFT_ERROR__BELOW_MINIMUM_AMOUNT
-  | typeof SOLGIFT_ERROR__CANNOT_GIFT_TO_PAST
-  | typeof SOLGIFT_ERROR__CANNOT_GIFT_TO_SELF
-  | typeof SOLGIFT_ERROR__DELIVERY_DATE_MUST_BE_IN_FUTURE
-  | typeof SOLGIFT_ERROR__GIFT_NOT_READY_YET
-  | typeof SOLGIFT_ERROR__GIFT_P_D_A_DOES_NOT_HAVE_N_F_T
-  | typeof SOLGIFT_ERROR__INVALID_ANSWER_HASH
-  | typeof SOLGIFT_ERROR__INVALID_RECEIVER
-  | typeof SOLGIFT_ERROR__INVALID_SALT
-  | typeof SOLGIFT_ERROR__MINT_AUTHORITY_NOT_REVOKED
-  | typeof SOLGIFT_ERROR__NOT_AN_N_F_T;
+  | typeof SOLGIFT_ERROR__CLAIMED_ALREADY
+  | typeof SOLGIFT_ERROR__GIFT_A_T_A_EMPTY
+  | typeof SOLGIFT_ERROR__INCORRECT_N_F_T_MINT
+  | typeof SOLGIFT_ERROR__INVALID_ANSWER
+  | typeof SOLGIFT_ERROR__UNAUTHORIZED_CLAIMER;
 
 let solgiftErrorMessages: Record<SolgiftError, string> | undefined;
 if (process.env.NODE_ENV !== "production") {
   solgiftErrorMessages = {
-    [SOLGIFT_ERROR__BELOW_MINIMUM_AMOUNT]: `Minimum 0.001 SOL required as gift amount`,
-    [SOLGIFT_ERROR__CANNOT_GIFT_TO_PAST]: `Cannot gift to past`,
-    [SOLGIFT_ERROR__CANNOT_GIFT_TO_SELF]: `Cannot gift to self`,
-    [SOLGIFT_ERROR__DELIVERY_DATE_MUST_BE_IN_FUTURE]: `Delivery date must be in future`,
-    [SOLGIFT_ERROR__GIFT_NOT_READY_YET]: `Gift in locked state, will open on delivery date!`,
-    [SOLGIFT_ERROR__GIFT_P_D_A_DOES_NOT_HAVE_N_F_T]: `Gift PDA does not own the NFT`,
-    [SOLGIFT_ERROR__INVALID_ANSWER_HASH]: `Invalid answer hash`,
-    [SOLGIFT_ERROR__INVALID_RECEIVER]: `Receiver public key is invalid`,
-    [SOLGIFT_ERROR__INVALID_SALT]: `Invalid salt`,
-    [SOLGIFT_ERROR__MINT_AUTHORITY_NOT_REVOKED]: `NFT mint authority not revoked`,
-    [SOLGIFT_ERROR__NOT_AN_N_F_T]: `Not an NFT`,
+    [SOLGIFT_ERROR__CLAIMED_ALREADY]: `Gift already claimed`,
+    [SOLGIFT_ERROR__GIFT_A_T_A_EMPTY]: `Gift ATA doesn't have the NFT`,
+    [SOLGIFT_ERROR__INCORRECT_N_F_T_MINT]: `NFT mint address did not match the NFT mint in gift escrow`,
+    [SOLGIFT_ERROR__INVALID_ANSWER]: `Answer entered is incorrect`,
+    [SOLGIFT_ERROR__UNAUTHORIZED_CLAIMER]: `Claimer is not the same as approved recipient`,
   };
 }
 

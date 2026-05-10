@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 use mpl_token_metadata::accounts::MasterEdition;
 use crate::constants::SEED_GIFT_ACCOUNT;
-use solana_program::hash::hash;
 use crate::error::{ClaimError, GiftError};
 use crate::state::Gift;
 use anchor_spl::associated_token::AssociatedToken;
@@ -54,7 +53,7 @@ pub struct ClaimGift<'info> {
     pub token_program: Interface<'info, TokenInterface>,
 }
 
-pub fn claim_gift(ctx: Context<ClaimGift>, answer_hash_n_1: [u8; 32]) -> Result<()> {
+pub fn claim_gift(ctx: Context<ClaimGift>) -> Result<()> {
     let mint = &ctx.accounts.nft_mint;
     let (master_edition_pda, _) = MasterEdition::find_pda(&mint.key());
     let mint_authority = mint.mint_authority;
@@ -71,13 +70,6 @@ pub fn claim_gift(ctx: Context<ClaimGift>, answer_hash_n_1: [u8; 32]) -> Result<
     require!(
         current_time >= gift.delivery_date,
         GiftError::GiftNotReadyYet
-    );
-
-    // Hash the provided answer and compare it with the stored answer_hash
-    let claimed_answer_hash: [u8; 32] = hash(&answer_hash_n_1).to_bytes();    
-    require!(
-        claimed_answer_hash == gift.answer_hash, 
-        ClaimError::InvalidAnswer
     );
 
     let id_bytes = gift.index.to_le_bytes();

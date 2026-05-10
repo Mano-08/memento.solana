@@ -63,7 +63,6 @@ export type Gift = {
   assetRecipient: Address;
   index: number;
   nftMint: Address;
-  answerHash: ReadonlyUint8Array;
   claimed: boolean;
   solAmount: bigint;
   claimedOn: bigint;
@@ -79,7 +78,6 @@ export type GiftArgs = {
   assetRecipient: Address;
   index: number;
   nftMint: Address;
-  answerHash: ReadonlyUint8Array;
   claimed: boolean;
   solAmount: number | bigint;
   claimedOn: number | bigint;
@@ -99,7 +97,6 @@ export function getGiftEncoder(): FixedSizeEncoder<GiftArgs> {
       ["assetRecipient", getAddressEncoder()],
       ["index", getU16Encoder()],
       ["nftMint", getAddressEncoder()],
-      ["answerHash", fixEncoderSize(getBytesEncoder(), 32)],
       ["claimed", getBooleanEncoder()],
       ["solAmount", getU64Encoder()],
       ["claimedOn", getI64Encoder()],
@@ -121,7 +118,6 @@ export function getGiftDecoder(): FixedSizeDecoder<Gift> {
     ["assetRecipient", getAddressDecoder()],
     ["index", getU16Decoder()],
     ["nftMint", getAddressDecoder()],
-    ["answerHash", fixDecoderSize(getBytesDecoder(), 32)],
     ["claimed", getBooleanDecoder()],
     ["solAmount", getU64Decoder()],
     ["claimedOn", getI64Decoder()],
@@ -188,5 +184,5 @@ export async function fetchAllMaybeGift(
 }
 
 export function getGiftSize(): number {
-  return 236;
+  return 204;
 }

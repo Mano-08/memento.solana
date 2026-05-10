@@ -1,8 +1,22 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { CreateGiftData } from "./types";
+import {
+  CreateGiftData,
+  CreateGiftStage,
+  GiftCreationStage,
+  GiftCreationStatus,
+} from "./types";
 import { DateTime } from "luxon";
-import { createSolanaRpc } from "@solana/kit";
+import {
+  compileTransaction,
+  createSolanaRpc,
+  FixedSizeEncoder,
+  generateKeyPair,
+  generateKeyPairSigner,
+  getProgramDerivedAddress,
+  lamports,
+  setTransactionMessageFeePayerSigner,
+} from "@solana/kit";
 import {
   address,
   Address,
@@ -187,10 +201,12 @@ export function validateGiftCreationInputs(
   if (!createGiftData.name.trim()) {
     throw new Error("Name is required");
   }
-  if (!createGiftData.phone || createGiftData.phone.length < 8) {
-    throw new Error(
-      "Recipient phone number is required and must be at least 8 digits"
-    );
+  if (
+    !createGiftData.email ||
+    typeof createGiftData.email !== "string" ||
+    createGiftData.email.trim().length === 0
+  ) {
+    throw new Error("Recipient email is required");
   }
   if (!createGiftData.securityAnswer) {
     throw new Error("Security answer is required");
@@ -231,7 +247,30 @@ export function validateDeliveryDate(deliveryDate: Date): {
 }
 
 import { getTransactionEncoder, getTransactionDecoder } from "@solana/kit";
-import { TransactionSendingSigner } from "@solana/connector";
+import { LAMPORTS_PER_SOL, TransactionSendingSigner } from "@solana/connector";
+import {
+  getCreateAccountInstruction,
+  getTransferSolInstruction,
+} from "@solana-program/system";
+import {
+  getCreateGiftInstruction,
+  SOLGIFT_PROGRAM_ADDRESS,
+} from "../generated/solgift";
+import { u16ToLeBytes } from "../helper/compute";
+import {
+  findAssociatedTokenPda,
+  findMasterEditionPda,
+  findMetadataPda,
+  getCreateMasterEditionV3Instruction,
+  getCreateMetadataAccountV3Instruction,
+} from "@metaplex-foundation/mpl-token-metadata-kit";
+import {
+  getCreateAssociatedTokenInstructionAsync,
+  getInitializeMintInstruction,
+  getMintSize,
+  getMintToInstruction,
+  TOKEN_PROGRAM_ADDRESS,
+} from "@solana-program/token";
 
 export function createPrivySigner(
   wallet: ConnectedStandardSolanaWallet
@@ -457,3 +496,299 @@ export function createAuthorizedRecipientSigner(
 }
 
 export const rpc = createSolanaRpc("https://api.devnet.solana.com");
+
+export async function runSimulation({
+  userPda,
+  salt,
+  count,
+  encoder,
+  addressEncoder,
+  signer,
+  createGiftData,
+  setGiftCreationStage,
+  authorizedClaimer,
+  authorizedClaimerSigner,
+}: {
+  userPda: Address<string>;
+  salt: Uint8Array<ArrayBuffer>;
+  count: number;
+  encoder: TextEncoder;
+  addressEncoder: FixedSizeEncoder<Address<string>, 32>;
+  signer: TransactionSigner<string>;
+  createGiftData: CreateGiftData;
+  setGiftCreationStage: React.Dispatch<
+    React.SetStateAction<GiftCreationStage[]>
+  >;
+  authorizedClaimer: Address;
+  authorizedClaimerSigner: TransactionPartialSigner;
+}) {
+  try {
+    setGiftCreationStage((prev) => {
+      return [
+        ...prev,
+        {
+          errorMessage: "",
+          stage: CreateGiftStage.PreparingTransaction,
+          status: GiftCreationStatus.Loading,
+        },
+      ];
+    });
+
+    const sim_instructions: Instruction[] = [];
+
+    sim_instructions.push();
+
+    const nftMint = await generateKeyPairSigner();
+
+    const [giftPda] = await getProgramDerivedAddress({
+      programAddress: SOLGIFT_PROGRAM_ADDRESS,
+      seeds: [
+        encoder.encode("gift"),
+        addressEncoder.encode(signer.address),
+        u16ToLeBytes(count),
+      ],
+    });
+
+    const [giftNftAta] = await findAssociatedTokenPda({
+      mint: nftMint.address,
+      owner: giftPda,
+      tokenProgram: TOKEN_PROGRAM_ADDRESS,
+    });
+
+    const [metadataPda] = await findMetadataPda({
+      mint: nftMint.address,
+    });
+
+    // Create mint account for NFT (mint has 0 decimals, 1 supply, non-fungible!)
+    const mintSize = getMintSize();
+    const mintRent = await rpc
+      .getMinimumBalanceForRentExemption(BigInt(mintSize))
+      .send();
+    const sim_createMintAccountIx = getCreateAccountInstruction({
+      payer: signer,
+      newAccount: nftMint,
+      lamports: mintRent,
+      space: BigInt(mintSize),
+      programAddress: TOKEN_PROGRAM_ADDRESS,
+    });
+
+    // Initialize mint - decimals: 0, mint and freeze authority = signer (required for NFT)
+    const sim_initMintIx = getInitializeMintInstruction({
+      mint: nftMint.address,
+      decimals: 0, // this is required for NFT (non-fungible)
+      mintAuthority: signer.address,
+      freezeAuthority: signer.address,
+    });
+
+    // Create Associated Token Account for the gift PDA to hold the NFT
+    const sim_createAtaIx = await getCreateAssociatedTokenInstructionAsync({
+      payer: signer,
+      ata: giftNftAta,
+      owner: giftPda,
+      mint: nftMint.address,
+    });
+
+    // Mint exactly 1 token into the gift PDA's ATA (supply = 1 means NFT)
+    const sim_mintToIx = getMintToInstruction({
+      mint: nftMint.address,
+      token: giftNftAta,
+      mintAuthority: signer,
+      amount: 1n,
+    });
+
+    // Attach Metaplex metadata, making this a certified NFT per standard, using URI, symbol, creators, etc.
+    const sim_createMetadataIx = getCreateMetadataAccountV3Instruction({
+      metadata: metadataPda,
+      mint: nftMint.address,
+      mintAuthority: signer,
+      payer: signer,
+      updateAuthority: signer.address,
+      data: {
+        name: "nftName",
+        symbol: "GIFT",
+        uri: `https://test/ipfs/test`,
+        sellerFeeBasisPoints: 0, // no royalties
+        creators: null, // or provide an array with creators if you want
+        collection: null,
+        uses: null,
+      },
+      isMutable: false,
+      collectionDetails: null,
+    });
+
+    const [masterEditionPda] = await findMasterEditionPda({
+      mint: nftMint.address,
+    });
+
+    const sim_createMasterEditionIx = getCreateMasterEditionV3Instruction({
+      edition: masterEditionPda,
+      mint: nftMint.address,
+      updateAuthority: signer,
+      mintAuthority: signer,
+      payer: signer,
+      metadata: metadataPda,
+      maxSupply: 0, // 0 = unique NFT, no prints allowed
+    });
+
+    const minRent = await rpc
+      .getMinimumBalanceForRentExemption(BigInt(0)) // 0 bytes = plain wallet
+      .send();
+
+    // Compute minRent required for ATA token account that will hold the NFT mint
+    // 165 is the size, in bytes, of an SPL Token Account according to the SPL Token program specification.
+    // See: https://spl.solana.com/token#account-layout
+    const TOKEN_ACCOUNT_SIZE = 165;
+    const minAtaRent = await rpc
+      .getMinimumBalanceForRentExemption(BigInt(TOKEN_ACCOUNT_SIZE))
+      .send();
+    const lamportsForOneTransaction = BigInt(5000);
+
+    const sim_fundRecipientIx = getTransferSolInstruction({
+      source: signer,
+      destination: authorizedClaimer,
+      amount: lamports(
+        minRent + minRent + minAtaRent + lamportsForOneTransaction
+      ),
+    });
+
+    const giftAmountValueRaw = createGiftData.giftAmount;
+    const giftAmountValue =
+      typeof giftAmountValueRaw === "string" ||
+      typeof giftAmountValueRaw === "number"
+        ? Number(giftAmountValueRaw)
+        : 0;
+    const solAmount: bigint = lamports(
+      BigInt(Math.floor(giftAmountValue * Number(LAMPORTS_PER_SOL)))
+    );
+
+    if (
+      !createGiftData.birthday ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(createGiftData.birthday)
+    ) {
+      throw new Error("Invalid date format. Expected yyyy-mm-dd");
+    }
+
+    // Parse the date string (yyyy-mm-dd)
+    const [y, m, d] = createGiftData.birthday.split("-").map(Number);
+
+    // Create date at midnight in user's local timezone
+    const selectedDate = new Date(y, m - 1, d);
+    selectedDate.setHours(0, 0, 0, 0);
+
+    // Get today at midnight in user's local timezone
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    // Validate: selected date must be today or future
+    if (selectedDate < todayStart) {
+      alert("Cannot schedule gifts for past dates");
+      return;
+    }
+
+    // Convert to Unix timestamp (UTC) - midnight in user's timezone
+    const birthdayTimestamp: bigint = BigInt(
+      Math.floor(selectedDate.getTime() / 1000)
+    );
+
+    const sim_createGiftIx = getCreateGiftInstruction({
+      signer: signer,
+      user: userPda,
+      gift: giftPda,
+      salt: salt,
+      nftMint: nftMint.address,
+      giftNftAta: giftNftAta,
+      solAmount: solAmount,
+      deliveryDate: birthdayTimestamp,
+      authorizedClaimer: authorizedClaimerSigner,
+    });
+
+    sim_instructions.push(sim_createMintAccountIx); // allocate
+    sim_instructions.push(sim_initMintIx); // initialize mint, signer = authority
+    sim_instructions.push(sim_createAtaIx); // create gift PDA's ATA
+    sim_instructions.push(sim_mintToIx); // mint 1 token → supply = 1
+    sim_instructions.push(sim_createMetadataIx); // attach metadata, signer still authority ✅
+    sim_instructions.push(sim_createMasterEditionIx);
+    sim_instructions.push(sim_createGiftIx); // Anchor checks all pass ✅
+    sim_instructions.push(sim_fundRecipientIx);
+
+    const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+
+    const transactionMessage = pipe(
+      createTransactionMessage({ version: "legacy" }),
+      (tx) => setTransactionMessageFeePayerSigner(signer, tx),
+      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+      (tx) => appendTransactionMessageInstructions(sim_instructions, tx)
+    );
+
+    const unsignedForSim = compileTransaction(transactionMessage);
+    const { value: simulation } = await rpc
+      .simulateTransaction(getBase64EncodedWireTransaction(unsignedForSim), {
+        encoding: "base64",
+        replaceRecentBlockhash: true,
+        sigVerify: false, // ← critical: skip sig check so unsigned tx simulates fine
+        commitment: "confirmed",
+      })
+      .send();
+
+    console.log("📋 Simulation logs:");
+    simulation.logs?.forEach((log, i) => console.log(`  [${i}] ${log}`));
+
+    if (simulation.err) {
+      // If this is a known Anchor custom error, show a readable message.
+      // From program: 3012 = GiftError::BelowMinimumAmount
+      // (See anchor/programs/solgift/src/error.rs)
+      let customMessage = "";
+
+      // Check for Anchor's custom error pattern
+      if (
+        typeof simulation.err === "object" &&
+        "InstructionError" in simulation.err &&
+        Array.isArray((simulation.err as any).InstructionError) &&
+        (simulation.err as any).InstructionError.length === 2
+      ) {
+        const [, detail] = simulation.err.InstructionError;
+        // If 'Custom' is present, extract the code
+        if (detail && typeof detail === "object" && "Custom" in detail) {
+          const code = detail.Custom;
+          if (code === 3012) {
+            customMessage =
+              "Minimum gift amount is 0.001 SOL. Please increase the SOL value.";
+          } else {
+            customMessage = `Anchor program custom error code: ${code}`;
+          }
+        }
+      }
+
+      console.error(
+        "❌ Simulation failed:",
+        JSON.stringify(
+          simulation.err,
+          (_, v) => (typeof v === "bigint" ? v.toString() : v),
+          2
+        )
+      );
+      throw new Error(
+        customMessage
+          ? `Simulation failed: ${customMessage}`
+          : `Simulation failed: ${JSON.stringify(simulation.err)}`
+      );
+    }
+  } catch (error) {
+    setGiftCreationStage((prev) => {
+      const idx = prev.findIndex(
+        (s) => s.stage === CreateGiftStage.PreparingTransaction
+      );
+      if (idx !== -1) {
+        const updated = [...prev];
+        updated[idx] = {
+          ...updated[idx],
+          errorMessage: "Internal Error",
+          status: GiftCreationStatus.Error,
+        };
+        return updated;
+      }
+      return prev;
+    });
+    throw new Error(String(error));
+  }
+}

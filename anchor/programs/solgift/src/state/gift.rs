@@ -10,7 +10,6 @@ pub struct Gift {
     pub asset_recipient:       Pubkey,              // 32 Bytes
     pub index:                 u16,                 // 2 Bytes
     pub nft_mint:              Pubkey,              // 32 Bytes
-    pub answer_hash:           [u8; 32],            // 32 Bytes
     pub claimed:               bool,                // 1 Byte
     pub sol_amount:            u64,                 // 8 Bytes
     pub claimed_on:            i64,                 // 8 Bytes 
@@ -27,7 +26,6 @@ impl Gift {
         32  +    // asset_recipient:       Pubkey            = 32 Bytes
         2   +    // index:                 u16               = 2 Bytes
         32  +    // nft_mint:              [u8; 32]          = 32 Bytes
-        32  +    // answer_hash:           [u8; 32]          = 32 Bytes
         1   +    // claimed:               bool              = 1 Byte
         8   +    // sol_amount:            u64               = 8 Bytes
         8   +    // claimed_on:            i64               = 8 Bytes 

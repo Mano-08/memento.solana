@@ -10,7 +10,6 @@ import {
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
-  getAddressDecoder,
   getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
@@ -55,6 +54,7 @@ export function getCreateGiftDiscriminatorBytes() {
 export type CreateGiftInstruction<
   TProgram extends string = typeof SOLGIFT_PROGRAM_ADDRESS,
   TAccountSigner extends string | AccountMeta<string> = string,
+  TAccountAuthorizedClaimer extends string | AccountMeta<string> = string,
   TAccountUser extends string | AccountMeta<string> = string,
   TAccountGift extends string | AccountMeta<string> = string,
   TAccountNftMint extends string | AccountMeta<string> = string,
@@ -74,6 +74,10 @@ export type CreateGiftInstruction<
         ? WritableSignerAccount<TAccountSigner> &
             AccountSignerMeta<TAccountSigner>
         : TAccountSigner,
+      TAccountAuthorizedClaimer extends string
+        ? WritableSignerAccount<TAccountAuthorizedClaimer> &
+            AccountSignerMeta<TAccountAuthorizedClaimer>
+        : TAccountAuthorizedClaimer,
       TAccountUser extends string
         ? WritableAccount<TAccountUser>
         : TAccountUser,
@@ -102,18 +106,14 @@ export type CreateGiftInstruction<
 export type CreateGiftInstructionData = {
   discriminator: ReadonlyUint8Array;
   salt: ReadonlyUint8Array;
-  answerHash: ReadonlyUint8Array;
   solAmount: bigint;
   deliveryDate: bigint;
-  authorizedClaimer: Address;
 };
 
 export type CreateGiftInstructionDataArgs = {
   salt: ReadonlyUint8Array;
-  answerHash: ReadonlyUint8Array;
   solAmount: number | bigint;
   deliveryDate: number | bigint;
-  authorizedClaimer: Address;
 };
 
 export function getCreateGiftInstructionDataEncoder(): FixedSizeEncoder<CreateGiftInstructionDataArgs> {
@@ -121,10 +121,8 @@ export function getCreateGiftInstructionDataEncoder(): FixedSizeEncoder<CreateGi
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["salt", fixEncoderSize(getBytesEncoder(), 32)],
-      ["answerHash", fixEncoderSize(getBytesEncoder(), 32)],
       ["solAmount", getU64Encoder()],
       ["deliveryDate", getI64Encoder()],
-      ["authorizedClaimer", getAddressEncoder()],
     ]),
     (value) => ({ ...value, discriminator: CREATE_GIFT_DISCRIMINATOR }),
   );
@@ -134,10 +132,8 @@ export function getCreateGiftInstructionDataDecoder(): FixedSizeDecoder<CreateGi
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["salt", fixDecoderSize(getBytesDecoder(), 32)],
-    ["answerHash", fixDecoderSize(getBytesDecoder(), 32)],
     ["solAmount", getU64Decoder()],
     ["deliveryDate", getI64Decoder()],
-    ["authorizedClaimer", getAddressDecoder()],
   ]);
 }
 
@@ -153,6 +149,7 @@ export function getCreateGiftInstructionDataCodec(): FixedSizeCodec<
 
 export type CreateGiftAsyncInput<
   TAccountSigner extends string = string,
+  TAccountAuthorizedClaimer extends string = string,
   TAccountUser extends string = string,
   TAccountGift extends string = string,
   TAccountNftMint extends string = string,
@@ -162,6 +159,7 @@ export type CreateGiftAsyncInput<
   TAccountTokenProgram extends string = string,
 > = {
   signer: TransactionSigner<TAccountSigner>;
+  authorizedClaimer: TransactionSigner<TAccountAuthorizedClaimer>;
   user?: Address<TAccountUser>;
   gift: Address<TAccountGift>;
   nftMint: Address<TAccountNftMint>;
@@ -170,14 +168,13 @@ export type CreateGiftAsyncInput<
   associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
   tokenProgram?: Address<TAccountTokenProgram>;
   salt: CreateGiftInstructionDataArgs["salt"];
-  answerHash: CreateGiftInstructionDataArgs["answerHash"];
   solAmount: CreateGiftInstructionDataArgs["solAmount"];
   deliveryDate: CreateGiftInstructionDataArgs["deliveryDate"];
-  authorizedClaimer: CreateGiftInstructionDataArgs["authorizedClaimer"];
 };
 
 export async function getCreateGiftInstructionAsync<
   TAccountSigner extends string,
+  TAccountAuthorizedClaimer extends string,
   TAccountUser extends string,
   TAccountGift extends string,
   TAccountNftMint extends string,
@@ -189,6 +186,7 @@ export async function getCreateGiftInstructionAsync<
 >(
   input: CreateGiftAsyncInput<
     TAccountSigner,
+    TAccountAuthorizedClaimer,
     TAccountUser,
     TAccountGift,
     TAccountNftMint,
@@ -202,6 +200,7 @@ export async function getCreateGiftInstructionAsync<
   CreateGiftInstruction<
     TProgramAddress,
     TAccountSigner,
+    TAccountAuthorizedClaimer,
     TAccountUser,
     TAccountGift,
     TAccountNftMint,
@@ -217,6 +216,10 @@ export async function getCreateGiftInstructionAsync<
   // Original accounts.
   const originalAccounts = {
     signer: { value: input.signer ?? null, isWritable: true },
+    authorizedClaimer: {
+      value: input.authorizedClaimer ?? null,
+      isWritable: true,
+    },
     user: { value: input.user ?? null, isWritable: true },
     gift: { value: input.gift ?? null, isWritable: true },
     nftMint: { value: input.nftMint ?? null, isWritable: false },
@@ -280,6 +283,7 @@ export async function getCreateGiftInstructionAsync<
   return Object.freeze({
     accounts: [
       getAccountMeta(accounts.signer),
+      getAccountMeta(accounts.authorizedClaimer),
       getAccountMeta(accounts.user),
       getAccountMeta(accounts.gift),
       getAccountMeta(accounts.nftMint),
@@ -295,6 +299,7 @@ export async function getCreateGiftInstructionAsync<
   } as CreateGiftInstruction<
     TProgramAddress,
     TAccountSigner,
+    TAccountAuthorizedClaimer,
     TAccountUser,
     TAccountGift,
     TAccountNftMint,
@@ -307,6 +312,7 @@ export async function getCreateGiftInstructionAsync<
 
 export type CreateGiftInput<
   TAccountSigner extends string = string,
+  TAccountAuthorizedClaimer extends string = string,
   TAccountUser extends string = string,
   TAccountGift extends string = string,
   TAccountNftMint extends string = string,
@@ -316,6 +322,7 @@ export type CreateGiftInput<
   TAccountTokenProgram extends string = string,
 > = {
   signer: TransactionSigner<TAccountSigner>;
+  authorizedClaimer: TransactionSigner<TAccountAuthorizedClaimer>;
   user: Address<TAccountUser>;
   gift: Address<TAccountGift>;
   nftMint: Address<TAccountNftMint>;
@@ -324,14 +331,13 @@ export type CreateGiftInput<
   associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
   tokenProgram?: Address<TAccountTokenProgram>;
   salt: CreateGiftInstructionDataArgs["salt"];
-  answerHash: CreateGiftInstructionDataArgs["answerHash"];
   solAmount: CreateGiftInstructionDataArgs["solAmount"];
   deliveryDate: CreateGiftInstructionDataArgs["deliveryDate"];
-  authorizedClaimer: CreateGiftInstructionDataArgs["authorizedClaimer"];
 };
 
 export function getCreateGiftInstruction<
   TAccountSigner extends string,
+  TAccountAuthorizedClaimer extends string,
   TAccountUser extends string,
   TAccountGift extends string,
   TAccountNftMint extends string,
@@ -343,6 +349,7 @@ export function getCreateGiftInstruction<
 >(
   input: CreateGiftInput<
     TAccountSigner,
+    TAccountAuthorizedClaimer,
     TAccountUser,
     TAccountGift,
     TAccountNftMint,
@@ -355,6 +362,7 @@ export function getCreateGiftInstruction<
 ): CreateGiftInstruction<
   TProgramAddress,
   TAccountSigner,
+  TAccountAuthorizedClaimer,
   TAccountUser,
   TAccountGift,
   TAccountNftMint,
@@ -369,6 +377,10 @@ export function getCreateGiftInstruction<
   // Original accounts.
   const originalAccounts = {
     signer: { value: input.signer ?? null, isWritable: true },
+    authorizedClaimer: {
+      value: input.authorizedClaimer ?? null,
+      isWritable: true,
+    },
     user: { value: input.user ?? null, isWritable: true },
     gift: { value: input.gift ?? null, isWritable: true },
     nftMint: { value: input.nftMint ?? null, isWritable: false },
@@ -406,6 +418,7 @@ export function getCreateGiftInstruction<
   return Object.freeze({
     accounts: [
       getAccountMeta(accounts.signer),
+      getAccountMeta(accounts.authorizedClaimer),
       getAccountMeta(accounts.user),
       getAccountMeta(accounts.gift),
       getAccountMeta(accounts.nftMint),
@@ -421,6 +434,7 @@ export function getCreateGiftInstruction<
   } as CreateGiftInstruction<
     TProgramAddress,
     TAccountSigner,
+    TAccountAuthorizedClaimer,
     TAccountUser,
     TAccountGift,
     TAccountNftMint,
@@ -438,13 +452,14 @@ export type ParsedCreateGiftInstruction<
   programAddress: Address<TProgram>;
   accounts: {
     signer: TAccountMetas[0];
-    user: TAccountMetas[1];
-    gift: TAccountMetas[2];
-    nftMint: TAccountMetas[3];
-    giftNftAta: TAccountMetas[4];
-    systemProgram: TAccountMetas[5];
-    associatedTokenProgram: TAccountMetas[6];
-    tokenProgram: TAccountMetas[7];
+    authorizedClaimer: TAccountMetas[1];
+    user: TAccountMetas[2];
+    gift: TAccountMetas[3];
+    nftMint: TAccountMetas[4];
+    giftNftAta: TAccountMetas[5];
+    systemProgram: TAccountMetas[6];
+    associatedTokenProgram: TAccountMetas[7];
+    tokenProgram: TAccountMetas[8];
   };
   data: CreateGiftInstructionData;
 };
@@ -457,7 +472,7 @@ export function parseCreateGiftInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCreateGiftInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 8) {
+  if (instruction.accounts.length < 9) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -471,6 +486,7 @@ export function parseCreateGiftInstruction<
     programAddress: instruction.programAddress,
     accounts: {
       signer: getNextAccount(),
+      authorizedClaimer: getNextAccount(),
       user: getNextAccount(),
       gift: getNextAccount(),
       nftMint: getNextAccount(),

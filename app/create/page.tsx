@@ -8,20 +8,19 @@ enum CREATE_GIFT_ERROR {
 }
 import {
   Dialog,
+  DialogTrigger,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogClose,
 } from "@/app/components/ui/dialog";
+import { Button } from "@/app/components/ui/button";
+import { CircleQuestionMark, Info } from "lucide-react";
+import { useState } from "react";
+
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 
-export enum CreateGiftStage {
-  NotStarted = "not_started",
-  UploadingImage = "uploading_image", // Correct spelling
-  WrappingGift = "wrapping_gift", // Locking/wrapping the NFT as a gift
-  SavingGiftInfo = "saving_gift_information", // Saving gift details to database
-  GiftCreatedSuccessfully = "gift_created_successfully", // Success stage
-  Error = "error",
-}
 import {
   fetchDigitalAsset,
   findMasterEditionPda,
@@ -38,6 +37,11 @@ import {
   signAndSendTransactionMessageWithSigners,
 } from "@solana/kit";
 import { useWalletAccountTransactionSendingSigner } from "@solana/react";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 
 import {
   Address,
@@ -51,13 +55,7 @@ import {
   setTransactionMessageLifetimeUsingBlockhash,
   TransactionSigner,
 } from "@solana/kit";
-import React, {
-  useEffect,
-  useState,
-  useRef,
-  useCallback,
-  useMemo,
-} from "react";
+import React, { useEffect, useRef, useCallback, useMemo } from "react";
 import {
   getCreateAccountInstruction,
   getTransferSolInstruction,
@@ -103,27 +101,26 @@ import {
   Van,
 } from "lucide-react";
 import { DatePicker } from "@/app/components/datepicker";
-import { Button } from "../components/ui/button";
 import { IconXmark } from "symbols-react";
-import { createPrivyTransactionSendingSigner, rpc } from "../lib/utils";
+import {
+  createAuthorizedRecipientSigner,
+  createPrivyTransactionSendingSigner,
+  rpc,
+  runSimulation,
+} from "../lib/utils";
 import { usePrivy } from "@privy-io/react-auth";
 import { ConnectButton } from "../components/connect-button";
 import Link from "next/link";
-
-type CreateGiftData = {
-  name: string;
-  giftAmount: number;
-  email: string;
-  birthday: string;
-  securityQuestion: string;
-  securityAnswer: string;
-};
-
-enum GiftCreationStatus {
-  Loading = "loading",
-  Success = "success",
-  Error = "error",
-}
+import {
+  CreateGiftData,
+  CreateGiftStage,
+  GiftCreationStage,
+  GiftCreationStatus,
+  GiftInputError,
+  SendGiftProps,
+  SendGiftWithEmbeddedWalletProps,
+  SendGiftWithExternalWalletProps,
+} from "../lib/types";
 
 export default function CreateGiftForm() {
   const { ready, user, authenticated } = usePrivy();
@@ -146,16 +143,15 @@ export default function CreateGiftForm() {
   }, [uiWallets, account])();
 
   const [createGiftData, setCreateGiftData] = useState<CreateGiftData>({
-    name: "Kef",
+    name: "Happy 21 Laura!",
     giftAmount: 0.001,
     birthday: formattedDate,
-    email: "mark@gmail.com",
-    securityQuestion: "our favorite band name",
+    email: "laura@gmail.com",
+    securityQuestion: "our favorite band name?",
     securityAnswer: "linkinpark",
   });
 
   useEffect(() => {
-    // Watch for giftInputError, and automatically clear it if the new input resolves the error
     if (giftInputError !== null) {
       switch (giftInputError) {
         case GiftInputError.gift_name:
@@ -207,7 +203,6 @@ export default function CreateGiftForm() {
           }
           break;
         default:
-          // Do nothing for unknown error types
           break;
       }
     }
@@ -226,8 +221,9 @@ export default function CreateGiftForm() {
 
   const handleSetGiftName = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const value = e.target.value.slice(0, 50);
       setCreateGiftData((prev) => {
-        return { ...prev, name: e.target.value };
+        return { ...prev, name: value };
       });
     },
     []
@@ -328,13 +324,20 @@ export default function CreateGiftForm() {
               name="nftName"
               value={createGiftData.name}
               onChange={handleSetGiftName}
-              placeholder="Ol days Laura"
+              placeholder="Gift Title"
               rows={1}
               style={{
                 whiteSpace: "pre-line",
                 wordBreak: "break-word",
                 overflowWrap: "break-word",
                 overflowY: "auto",
+                minHeight: "64px",
+                maxHeight: "300px",
+              }}
+              onInput={(e) => {
+                const target = e.target as HTMLTextAreaElement;
+                target.style.height = "64px";
+                target.style.height = `${Math.min(target.scrollHeight, 300)}px`;
               }}
             />
           </fieldset>
@@ -344,7 +347,22 @@ export default function CreateGiftForm() {
               htmlFor="birthday"
             >
               <Calendar size={16} /> Gift Reveal Date
+              <HoverCard>
+                <HoverCardTrigger asChild>
+                  <span
+                    className="w-4 h-4 flex items-center justify-center rounded-full cursor-pointer transition-colors text-neutral-5500 hover:text-neutral-200"
+                    tabIndex={0}
+                  >
+                    <CircleQuestionMark size={14} />
+                  </span>
+                </HoverCardTrigger>
+                <HoverCardContent className="text-xs py-2 px-3 rounded-xl bg-white/95 text-black shadow">
+                  Your friend can retrieve gift on this day, it will be locked
+                  before that
+                </HoverCardContent>
+              </HoverCard>
             </label>
+
             <DatePicker
               birthday={
                 createGiftData.birthday
@@ -384,6 +402,20 @@ export default function CreateGiftForm() {
               htmlFor="email"
             >
               <Mail size={16} /> Recipient Email
+              <HoverCard>
+                <HoverCardTrigger asChild>
+                  <span
+                    className="w-4 h-4 flex items-center justify-center rounded-full cursor-pointer transition-colors text-neutral-5500 hover:text-neutral-200"
+                    tabIndex={0}
+                  >
+                    <CircleQuestionMark size={14} />
+                  </span>
+                </HoverCardTrigger>
+                <HoverCardContent className="text-xs py-2 px-3 rounded-xl bg-white/95 text-black shadow">
+                  We'll let your friend know about their gift using this email
+                  as soon as it's ready to open.
+                </HoverCardContent>
+              </HoverCard>
             </label>
             <input
               className={`rounded-full shrink-0 text-right grow border-none py-2.5 text-sm px-3 leading-none text-neutral-300 outline-none`}
@@ -404,7 +436,22 @@ export default function CreateGiftForm() {
               htmlFor="giftAmount"
             >
               <DollarSign size={16} /> Gift Amount
+              <HoverCard>
+                <HoverCardTrigger asChild>
+                  <span
+                    className="w-4 h-4 flex items-center justify-center rounded-full cursor-pointer transition-colors text-neutral-5500 hover:text-neutral-200"
+                    tabIndex={0}
+                  >
+                    <CircleQuestionMark size={14} />
+                  </span>
+                </HoverCardTrigger>
+                <HoverCardContent className="text-xs py-2 px-3 rounded-xl bg-white/95 text-black shadow">
+                  The SOL amount your friend will be able to withdraw or claim
+                  along with the NFT.
+                </HoverCardContent>
+              </HoverCard>
             </label>
+
             <div>
               <input
                 className="rounded-md shrink-0 grow text-right border-none py-2.5 leading-none text-neutral-300 outline-none"
@@ -427,10 +474,24 @@ export default function CreateGiftForm() {
               <LockKeyhole size={16} className="text-neutral-400" />
               <div className="border-b w-full border-black/5 border-solid flex flex-row items-center">
                 <label
-                  className="leading-none text-neutral-400"
+                  className="leading-none text-neutral-400 flex flex-row items-center gap-2"
                   htmlFor="question"
                 >
                   Security Question
+                  <HoverCard>
+                    <HoverCardTrigger asChild>
+                      <span
+                        className="w-4 h-4 flex items-center justify-center rounded-full cursor-pointer transition-colors text-neutral-5500 hover:text-neutral-200"
+                        tabIndex={0}
+                      >
+                        <CircleQuestionMark size={14} />
+                      </span>
+                    </HoverCardTrigger>
+                    <HoverCardContent className="text-xs py-2 px-3 rounded-xl bg-white/95 text-black shadow">
+                      Set a question and answer that only your friend will know,
+                      this is required for them to claim the gift.
+                    </HoverCardContent>
+                  </HoverCard>
                 </label>
                 <input
                   id="question"
@@ -480,7 +541,7 @@ export default function CreateGiftForm() {
               createGiftData={createGiftData}
             />
           ) : (
-            <ConnectButton className="font-semibold cursor-pointer text-white/50 hover:text-black/90 hover:bg-white/60 my-2 px-3 py-1 text-sm rounded-full" />
+            <ConnectButton className="font-semibold cursor-pointer hover:bg-white/80 text-black/90 bg-white/60 my-2 px-3 py-2 text-lg rounded-lg " />
           )}
         </div>
       </form>
@@ -488,14 +549,6 @@ export default function CreateGiftForm() {
   );
 }
 
-type SendGiftWithExternalWalletProps = {
-  uiWalletAccount: UiWalletAccount;
-  imageFile: File | null;
-  setGiftInputError: React.Dispatch<
-    React.SetStateAction<GiftInputError | null>
-  >;
-  createGiftData: CreateGiftData;
-};
 function SendGiftWithExternalWallet({
   uiWalletAccount,
   imageFile,
@@ -517,14 +570,6 @@ function SendGiftWithExternalWallet({
   );
 }
 
-type SendGiftWithEmbeddedWalletProps = {
-  wallet: ConnectedStandardSolanaWallet;
-  imageFile: File | null;
-  setGiftInputError: React.Dispatch<
-    React.SetStateAction<GiftInputError | null>
-  >;
-  createGiftData: CreateGiftData;
-};
 function SendGiftWithEmbeddedWallet({
   wallet,
   imageFile,
@@ -542,31 +587,6 @@ function SendGiftWithEmbeddedWallet({
   );
 }
 
-type GiftCreationStage = {
-  info?: string;
-  stage: CreateGiftStage;
-  status: GiftCreationStatus;
-  errorMessage: string;
-};
-
-enum GiftInputError {
-  gift_name = "gift_name",
-  gift_image = "gift_image",
-  reveal_date = "reveal_date",
-  recipient_email = "recipient_email",
-  gift_amount = "gift_amount",
-  security_question = "security_question",
-  security_answer = "security_answer",
-}
-
-type SendGiftProps = {
-  signer: TransactionSigner<string>;
-  imageFile: File | null;
-  setGiftInputError: React.Dispatch<
-    React.SetStateAction<GiftInputError | null>
-  >;
-  createGiftData: CreateGiftData;
-};
 function SendGift({
   signer,
   imageFile,
@@ -633,97 +653,21 @@ function SendGift({
 
     const nftName = createGiftData.name.trim();
     if (!nftName) throw new Error("Enter NFT Name");
-
+    const addressEncoder = getAddressEncoder();
     await assertProgramsDeployed(rpc, [
       SOLGIFT_PROGRAM_ADDRESS,
       "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s" as Address<"metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s">, // Metaplex token metadata
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">, // SPL Token (should always exist)
     ]);
+
+    if (!signer) {
+      toast.error("Connect Wallet", {
+        description: "Please connect your wallet to continue.",
+      });
+
+      throw Error("Please connect your wallet to continue.");
+    }
     try {
-      setGiftCreationStage((prev) => {
-        return [
-          ...prev,
-          {
-            errorMessage: "",
-            stage: CreateGiftStage.UploadingImage,
-            status: GiftCreationStatus.Loading,
-          },
-        ];
-      });
-
-      if (!signer) {
-        toast.error("Connect Wallet", {
-          description: "Please connect your wallet to continue.",
-        });
-
-        throw Error("Please connect your wallet to continue.");
-      }
-      let imageCid: string = await uploadImageToPinata(imageFile);
-      const nftDescription = "A present!";
-      let metadataCid: string = await uploadMetadataToPinata({
-        nftName,
-        nftDescription,
-        imageCid,
-      });
-
-      const question = createGiftData.securityQuestion;
-      if (!imageCid || !metadataCid) {
-        setGiftCreationStage((prev) => {
-          const idx = prev.findIndex(
-            (s) => s.stage === CreateGiftStage.UploadingImage
-          );
-          if (idx !== -1) {
-            const updated = [...prev];
-            updated[idx] = {
-              ...updated[idx],
-              errorMessage: "Failed to upload image to IPFS",
-              status: GiftCreationStatus.Error,
-            };
-            return updated;
-          }
-          return prev;
-        });
-        throw new Error(
-          `PINATA ERROR: ${CREATE_GIFT_ERROR.FAILED_TO_UPLOAD_TO_IPFS}`
-        );
-      }
-      // "bafkreidgjaaey4q3ergcx5cz5wv65jlc5yzcmx3ayz5ewe5afdkazjmyga"; // await uploadImageToPinata(imageFile);
-
-      setGiftCreationStage((prev) => {
-        const idx = prev.findIndex(
-          (s) => s.stage === CreateGiftStage.UploadingImage
-        );
-        if (idx !== -1) {
-          // Update existing UploadingImage stage
-          const updated = [...prev];
-          updated[idx] = {
-            ...updated[idx],
-            errorMessage: "",
-            status: GiftCreationStatus.Success,
-          };
-          return updated;
-        }
-        // If not found, just return prev unchanged (or you may choose to push, but per instruction do not)
-        return prev;
-      });
-
-      setGiftCreationStage((prev) => {
-        return [
-          ...prev,
-          {
-            errorMessage: "",
-            stage: CreateGiftStage.WrappingGift,
-            status: GiftCreationStatus.Loading,
-          },
-        ];
-      });
-
-      // const metadataCid =
-      //   "bafkreihwdt4qma5eggireiuflt6k4h6yqgnv7pk7f4umd52rnwyrxzexuq";
-
-      //"bafkreihwdt4qma5eggireiuflt6k4h6yqgnv7pk7f4umd52rnwyrxzexuq";
-
-      // step 3: nftMint nftmf
       try {
         const email: string = createGiftData.email;
         const salt = crypto.getRandomValues(new Uint8Array(32));
@@ -777,6 +721,9 @@ function SendGift({
 
         const authorizedClaimerKeypair =
           await createKeyPairSignerFromPrivateKeyBytes(seed);
+        const authorizedClaimerSigner = createAuthorizedRecipientSigner(
+          authorizedClaimerKeypair
+        );
         const authorizedClaimer = authorizedClaimerKeypair.address;
 
         async function sendAndConfirm(options: {
@@ -797,78 +744,12 @@ function SendGift({
             (tx) => appendTransactionMessageInstructions(instructions, tx)
           );
 
-          // ── Simulate without signing first (pass accounts, skip signers) ──────────
-          // Build an unsigned wire transaction just for simulation
-          const unsignedForSim = compileTransaction(transactionMessage);
-
-          const { value: simulation } = await rpc
-            .simulateTransaction(
-              getBase64EncodedWireTransaction(unsignedForSim),
-              {
-                encoding: "base64",
-                replaceRecentBlockhash: true,
-                sigVerify: false, // ← critical: skip sig check so unsigned tx simulates fine
-                commitment: "confirmed",
-              }
-            )
-            .send();
-
-          console.log("📋 Simulation logs:");
-          simulation.logs?.forEach((log, i) => console.log(`  [${i}] ${log}`));
-
-          if (simulation.err) {
-            // If this is a known Anchor custom error, show a readable message.
-            // From program: 3012 = GiftError::BelowMinimumAmount
-            // (See anchor/programs/solgift/src/error.rs)
-            let customMessage = "";
-
-            // Check for Anchor's custom error pattern
-            if (
-              typeof simulation.err === "object" &&
-              "InstructionError" in simulation.err &&
-              Array.isArray((simulation.err as any).InstructionError) &&
-              (simulation.err as any).InstructionError.length === 2
-            ) {
-              const [, detail] = simulation.err.InstructionError;
-              // If 'Custom' is present, extract the code
-              if (detail && typeof detail === "object" && "Custom" in detail) {
-                const code = detail.Custom;
-                if (code === 3012) {
-                  customMessage =
-                    "Minimum gift amount is 0.001 SOL. Please increase the SOL value.";
-                } else {
-                  customMessage = `Anchor program custom error code: ${code}`;
-                }
-              }
-            }
-
-            console.error(
-              "❌ Simulation failed:",
-              JSON.stringify(
-                simulation.err,
-                (_, v) => (typeof v === "bigint" ? v.toString() : v),
-                2
-              )
-            );
-            throw new Error(
-              customMessage
-                ? `Simulation failed: ${customMessage}`
-                : `Simulation failed: ${JSON.stringify(simulation.err)}`
-            );
-          }
-
-          console.log("✅ Simulation passed — prompting wallet...");
-
-          // ── signAndSendTransactionMessageWithSigners calls TransactionSendingSigner ──
-          // This is the ONLY function that triggers Phantom for a SendingSigner
           const signature =
             await signAndSendTransactionMessageWithSigners(transactionMessage);
 
           console.log("✅ Sent:", signature);
           return signature;
         }
-
-        const addressEncoder = getAddressEncoder();
 
         const [userPda] = await getProgramDerivedAddress({
           programAddress: SOLGIFT_PROGRAM_ADDRESS,
@@ -888,9 +769,6 @@ function SendGift({
           );
           count = view.getUint16(8, true);
         }
-
-        // ---- Ensure we're minting a true NFT (non-fungible token) following Solana Metaplex standard ----
-        // 1. Derive PDA for the NFT gift account
         const [giftPda] = await getProgramDerivedAddress({
           programAddress: SOLGIFT_PROGRAM_ADDRESS,
           seeds: [
@@ -947,6 +825,132 @@ function SendGift({
           amount: 1n,
         });
 
+        try {
+          setGiftCreationStage((prev) => {
+            return [
+              ...prev,
+              {
+                errorMessage: "",
+                stage: CreateGiftStage.PreparingTransaction,
+                status: GiftCreationStatus.Loading,
+              },
+            ];
+          });
+          await runSimulation({
+            userPda,
+            salt,
+            count,
+            encoder,
+            addressEncoder,
+            signer,
+            createGiftData,
+            setGiftCreationStage,
+            authorizedClaimer,
+            authorizedClaimerSigner,
+          });
+        } catch (error) {
+          setGiftCreationStage((prev) => {
+            const idx = prev.findIndex(
+              (s) => s.stage === CreateGiftStage.PreparingTransaction
+            );
+            if (idx !== -1) {
+              const updated = [...prev];
+              updated[idx] = {
+                ...updated[idx],
+                errorMessage: "Please check wallet balance and try again",
+                status: GiftCreationStatus.Error,
+              };
+              return updated;
+            }
+            return prev;
+          });
+          throw new Error(String(error));
+        }
+        setGiftCreationStage((prev) => {
+          const idx = prev.findIndex(
+            (s) => s.stage === CreateGiftStage.PreparingTransaction
+          );
+          if (idx !== -1) {
+            const updated = [...prev];
+            updated[idx] = {
+              ...updated[idx],
+              errorMessage: "",
+              status: GiftCreationStatus.Success,
+            };
+            return updated;
+          }
+          return prev;
+        });
+        setGiftCreationStage((prev) => {
+          return [
+            ...prev,
+            {
+              errorMessage: "",
+              stage: CreateGiftStage.UploadingImage,
+              status: GiftCreationStatus.Loading,
+            },
+          ];
+        });
+
+        let imageCid: string = await uploadImageToPinata(imageFile);
+        const nftDescription = "A present!";
+        let metadataCid: string = await uploadMetadataToPinata({
+          nftName,
+          nftDescription,
+          imageCid,
+        });
+
+        const question = createGiftData.securityQuestion;
+        if (!imageCid || !metadataCid) {
+          setGiftCreationStage((prev) => {
+            const idx = prev.findIndex(
+              (s) => s.stage === CreateGiftStage.UploadingImage
+            );
+            if (idx !== -1) {
+              const updated = [...prev];
+              updated[idx] = {
+                ...updated[idx],
+                errorMessage: "Failed to upload image to IPFS",
+                status: GiftCreationStatus.Error,
+              };
+              return updated;
+            }
+            return prev;
+          });
+          throw new Error(
+            `PINATA ERROR: ${CREATE_GIFT_ERROR.FAILED_TO_UPLOAD_TO_IPFS}`
+          );
+        }
+
+        setGiftCreationStage((prev) => {
+          const idx = prev.findIndex(
+            (s) => s.stage === CreateGiftStage.UploadingImage
+          );
+          if (idx !== -1) {
+            // Update existing UploadingImage stage
+            const updated = [...prev];
+            updated[idx] = {
+              ...updated[idx],
+              errorMessage: "",
+              status: GiftCreationStatus.Success,
+            };
+            return updated;
+          }
+          // If not found, just return prev unchanged (or you may choose to push, but per instruction do not)
+          return prev;
+        });
+
+        setGiftCreationStage((prev) => {
+          return [
+            ...prev,
+            {
+              errorMessage: "",
+              stage: CreateGiftStage.WrappingGift,
+              status: GiftCreationStatus.Loading,
+            },
+          ];
+        });
+
         // Attach Metaplex metadata, making this a certified NFT per standard, using URI, symbol, creators, etc.
         const createMetadataIx = getCreateMetadataAccountV3Instruction({
           metadata: metadataPda,
@@ -981,37 +985,6 @@ function SendGift({
           maxSupply: 0, // 0 = unique NFT, no prints allowed
         });
 
-        // Revoke mint authority so no more tokens can ever be minted for this NFT.
-        const revokeMintIx = getSetAuthorityInstruction({
-          owned: nftMint.address,
-          owner: masterEditionPda,
-          authorityType: AuthorityType.MintTokens,
-          newAuthority: null,
-        });
-
-        // Revoke freeze authority so mint can't be frozen/unfrozen anymore.
-        const revokeFreezeIx = getSetAuthorityInstruction({
-          owned: nftMint.address,
-          owner: masterEditionPda,
-          authorityType: AuthorityType.FreezeAccount,
-          newAuthority: null,
-        });
-
-        // -----------
-        // The combination of:
-        // - 0 decimals,
-        // - max supply 1,
-        // - Metaplex metadata (Token Metadata Program with URI & name),
-        // makes this a true NFT.
-        // To ensure this appears as an NFT and not just a "Token," make sure the Metaplex metadata is successfully created and attached to the mint account using the Token Metadata Program.
-        // This is done by sending a `createMetadataIx` instruction that includes the NFT's name, symbol, URI, and other relevant fields.
-        // After your transaction, you can verify the NFT by checking the metadata account on Solscan or any Solana explorer.
-        // If the NFT still shows up only as a generic token in wallets like Phantom, double-check that:
-        //   1. The URI is correct and serves proper JSON metadata.
-        //   2. The metadata account address matches the mint.
-        //   3. Wallets have refreshed their metadata cache (sometimes delays happen).
-        // The recipient should receive this as an NFT in wallets that support NFTs (like Phantom).
-        // -----------
         const minRent = await rpc
           .getMinimumBalanceForRentExemption(BigInt(0)) // 0 bytes = plain wallet
           .send();
@@ -1032,11 +1005,6 @@ function SendGift({
             minRent + minRent + minAtaRent + lamportsForOneTransaction
           ),
         });
-
-        const answerHash = await recursiveSha256(
-          combined,
-          RECURSIVE_HASH_DEPTH
-        );
 
         const giftAmountValueRaw = createGiftData.giftAmount;
         const giftAmountValue =
@@ -1084,10 +1052,9 @@ function SendGift({
           salt: salt,
           nftMint: nftMint.address,
           giftNftAta: giftNftAta,
-          answerHash: answerHash,
           solAmount: solAmount,
           deliveryDate: birthdayTimestamp,
-          authorizedClaimer: authorizedClaimer,
+          authorizedClaimer: authorizedClaimerSigner,
         });
 
         instructions.push(createMintAccountIx); // allocate
@@ -1096,8 +1063,6 @@ function SendGift({
         instructions.push(mintToIx); // mint 1 token → supply = 1
         instructions.push(createMetadataIx); // attach metadata, signer still authority ✅
         instructions.push(createMasterEditionIx);
-        // instructions.push(revokeMintIx); // mint_authority → None ✅
-        // instructions.push(revokeFreezeIx); // freeze_authority → None
         instructions.push(createGiftIx); // Anchor checks all pass ✅
         instructions.push(fundRecipientIx);
 
@@ -1480,6 +1445,7 @@ function LoadingStagesModal({
   onOpenChange: (open: boolean) => void;
 }) {
   const stageLabels: { stage: CreateGiftStage; label: string }[] = [
+    { stage: CreateGiftStage.PreparingTransaction, label: "Validating Inputs" },
     { stage: CreateGiftStage.UploadingImage, label: "Upload Image" },
     { stage: CreateGiftStage.WrappingGift, label: "Wrapping Gift" },
     { stage: CreateGiftStage.SavingGiftInfo, label: "Saving Gift Info" },
@@ -1623,13 +1589,10 @@ function LoadingStagesModal({
               const isLoading =
                 currentStageInfo?.status === GiftCreationStatus.Loading;
 
-              // Style logic
               let labelClasses = ["transition-colors", "duration-200"];
               if (isLoading) {
-                // Opacity 100%, text-2xl, font-bold
                 labelClasses.push("opacity-100", "text-black", "font-bold");
               } else {
-                // All other: base, opacity-75, regular
                 labelClasses.push("text-sm", "text-black/50");
               }
 
@@ -1641,9 +1604,7 @@ function LoadingStagesModal({
 
               return (
                 <div className="flex items-center gap-2.5" key={stage}>
-                  {/* Icon */}
                   {isLoading ? (
-                    // Show independent spinner when loading
                     <span
                       className="flex items-center justify-center"
                       style={{ minWidth: "1.25rem", minHeight: "1.25rem" }}
@@ -1684,7 +1645,6 @@ function LoadingStagesModal({
                       style={{ minWidth: "1.25rem", minHeight: "1.25rem" }}
                     >
                       {isCompleted ? (
-                        // Deep green background, white tick
                         <svg
                           className="h-3 w-3 text-white"
                           fill="none"
@@ -1699,7 +1659,6 @@ function LoadingStagesModal({
                           />
                         </svg>
                       ) : isError ? (
-                        // Red background, white X
                         <svg
                           className="h-3 w-3 text-white"
                           fill="none"
@@ -1723,7 +1682,7 @@ function LoadingStagesModal({
           </div>
         )}
         {firstError && (
-          <div className="rounded-xl mt-2 p-3 text-xs border border-red-200 bg-red-50 text-black">
+          <div className="rounded-xl mt-2 p-3 mx-7 mb-7 text-xs border border-red-200 bg-red-50 text-black">
             {firstError.errorMessage}
           </div>
         )}

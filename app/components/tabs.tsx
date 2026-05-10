@@ -245,7 +245,7 @@ function GiftCard({
     tagLabel = "not claimed";
     tagClass = "bg-red-200";
   } else {
-    tagLabel = "yet to claim";
+    tagLabel = "not delivered";
     tagClass = "bg-yellow-100";
   }
 

@@ -5,14 +5,23 @@ import { ConnectButton } from "./connect-button";
 import Image from "next/image";
 import solgiftLogo from "@/public/solgiftLogo.png";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, X } from "lucide-react";
+import { ArrowLeft, CircleQuestionMark, Info, X } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from "@/app/components/ui/dialog";
 import {
   useCluster,
   useConnector,
   useConnectorClient,
 } from "@solana/connector/react";
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "./ui/button";
 import {
   createUserAccountIfNotExist,
@@ -27,6 +36,7 @@ import {
   createKitSignersFromWallet,
   createSignableMessage,
 } from "@solana/connector/headless";
+import { IconQuestionmark } from "symbols-react";
 
 export default function AppNav() {
   const pathname = usePathname();
@@ -49,142 +59,18 @@ export default function AppNav() {
   }
 
   const { ready, user, authenticated } = usePrivy();
-
-  const {
-    isConnected,
-    account,
-    connector,
-    walletConnectUri,
-    isConnecting,
-    clearWalletConnectUri,
-  } = useConnector();
+  const [open, setOpen] = useState(false);
+  const { account, isConnecting, isConnected, clearWalletConnectUri } =
+    useConnector();
 
   const [userConnected, setUserConnected] = React.useState<boolean>(false);
   const [scrolled, setScrolled] = React.useState<boolean>(false);
-  // const connectedToExternalWallet = isConnected && account && connector;
-  // const connectedToEmbeddedWallet = ready && user && authenticated;
-  // const { wallets } = useWallets();
-  // const { walletStatus, connectorId } = useConnector();
-  // const { cluster } = useCluster();
-  // const client = useConnectorClient();
 
-  // async function handleSignIntoSupabase({
-  //   supabase,
-  // }: {
-  //   supabase: SupabaseClient<any, "public", "public", any, any>;
-  // }) {
-  //   if (user && wallets.length) {
-  //     const privyWallet = wallets.find(
-  //       (w) => w.standardWallet?.name === "Privy"
-  //     );
-  //     if (privyWallet) {
-  //       await signIntoSupabaseWithPrivy({
-  //         supabase,
-  //         wallet: privyWallet,
-  //         user,
-  //       });
-  //     }
-  //   }
-  // }
-
-  // async function handleSignIntoSupabaseExternalWallet({
-  //   supabase,
-  // }: {
-  //   supabase: SupabaseClient<any, "public", "public", any, any>;
-  // }) {
-  //   if (account && connectorId && walletStatus.status === "connected") {
-  //     const {
-  //       data: { session },
-  //     } = await supabase.auth.getSession();
-
-  //     if (session) {
-  //       const supabase_address = session.user.user_metadata?.custom_claims
-  //         ?.address as string | undefined;
-  //       if (supabase_address !== null && account !== supabase_address) {
-  //         console.log("SOB");
-  //         signOutofSupabase({ supabase });
-  //       }
-
-  //       return;
-  //     }
-  //     // Inline logic from previous version, rewritten:
-  //     const wallet = client?.getConnector(connectorId);
-  //     const walletAccount =
-  //       walletStatus.status === "connected"
-  //         ? walletStatus.session.selectedAccount.account
-  //         : null;
-
-  //     if (wallet && walletAccount && cluster && client) {
-  //       // UseMemo is not needed here (runs once as effect)
-  //       const rpcUrl = client.getRpcUrl();
-  //       const connection = rpcUrl ? new Connection(rpcUrl) : null;
-  //       const kitSigners = createKitSignersFromWallet(
-  //         wallet,
-  //         walletAccount,
-  //         connection,
-  //         undefined
-  //       );
-  //       const { error } = await supabase.auth.signInWithWeb3({
-  //         chain: "solana",
-  //         statement: "I accept the Terms of Service at https://example.com/tos",
-  //         wallet: {
-  //           publicKey: {
-  //             toBase58: () => account,
-  //           },
-  //           signMessage: async (message: Uint8Array) => {
-  //             if (!kitSigners || !kitSigners.messageSigner) {
-  //               throw new Error("Wallet not ready for signing");
-  //             }
-  //             const signableMessage = createSignableMessage(message);
-  //             const signedMessages =
-  //               await kitSigners.messageSigner.modifyAndSignMessages([
-  //                 signableMessage,
-  //               ]);
-  //             const signatureMap = signedMessages[0].signatures;
-  //             return signatureMap[account];
-  //           },
-  //         },
-  //       });
-  //       await createUserAccountIfNotExist({
-  //         walletAddress: account,
-  //         supabase,
-  //       });
-  //       if (error) {
-  //         // Don't loop, just log error and don't reprompt unless wallet/account changes
-  //         console.error("Error signing in with wallet:", error);
-  //       }
-  //     }
-  //   }
-  // }
-
-  // async function handleSignOutOfSupabase({
-  //   supabase,
-  // }: {
-  //   supabase: SupabaseClient<any, "public", "public", any, any>;
-  // }) {
-  //   await signOutofSupabase({ supabase });
-  // }
-
-  // React.useEffect(() => {
-  //   if (ready && !isConnecting) {
-  //     const supabase = createClient();
-  //     if (connectedToExternalWallet || connectedToEmbeddedWallet) {
-  //       setUserConnected(true);
-  //       if (connectedToExternalWallet) {
-  //         handleSignIntoSupabaseExternalWallet({ supabase });
-  //       } else {
-  //         handleSignIntoSupabase({ supabase });
-  //       }
-  //     } else {
-  //       handleSignOutOfSupabase({ supabase });
-  //     }
-  //   }
-  // }, [
-  //   connectedToExternalWallet,
-  //   connectedToEmbeddedWallet,
-  //   ready,
-  //   isConnected,
-  // ]);
+  React.useEffect(() => {
+    if (authenticated || account) {
+      setUserConnected(true);
+    }
+  }, [account, authenticated]);
 
   // Scroll event for navbar background color
   React.useEffect(() => {
@@ -200,43 +86,114 @@ export default function AppNav() {
   }, []);
 
   return (
-    <header className="w-full sticky z-50 top-0 h-14">
+    <header className={`w-full sticky z-50 top-0 h-14`}>
       <div
-        className={`relative animate-slideDown flex flex-row items-center px-5 justify-between mx-auto text-black h-14 w-full -mt-14 transition-colors duration-300 ${
+        className={`${isClaim ? "justify-end" : "justify-between"} relative animate-slideDown flex flex-row items-center px-5  mx-auto text-black h-14 w-full -mt-14 transition-colors duration-300 ${
           scrolled ? "backdrop-blur-sm" : ""
         }`}
         style={{
           backgroundColor: scrolled ? "#020117c3" : "transparent",
         }}
       >
-        <div className="flex flex-row items-center gap-2 opacity-50">
-          <Link href="/">
-            {BrandIcon ? (
-              BrandIcon
-            ) : (
-              <Image src={solgiftLogo} alt="Logo" height={24} width={24} />
-            )}
-          </Link>
-          <div
-            className={
-              !isRoot ? "h-8 mt-1 mx-3.5 w-px bg-neutral-300" : "hidden"
-            }
-          ></div>
-          <h1 className={`text-neutral-300 font-semibold text-sm`}>
-            {brandLabel}
-          </h1>
-        </div>
-        <div className="flex flex-row items-center gap-3">
-          {userConnected && (
-            <Link href="/dashboard">
-              <button className="font-semibold cursor-pointer text-neutral-500 text-sm hover:text-black my-2 pl-3 pr-2 py-1.5 hover:bg-white rounded-full">
-                Profile
-              </button>
+        {!isClaim && (
+          <div className="flex flex-row items-center gap-2 opacity-50">
+            <Link href="/">
+              {BrandIcon ? (
+                BrandIcon
+              ) : (
+                <Image src={solgiftLogo} alt="Logo" height={24} width={24} />
+              )}
             </Link>
-          )}
-          <ConnectButton className="font-semibold cursor-pointer text-white/50 hover:text-black/90 hover:bg-white/60 my-2 px-3 py-1 text-sm rounded-full" />
+            <div
+              className={
+                !isRoot ? "h-8 mt-1 mx-3.5 w-px bg-neutral-300" : "hidden"
+              }
+            ></div>
+            <h1 className={`text-neutral-300 font-semibold text-sm`}>
+              {brandLabel}
+            </h1>
+          </div>
+        )}
+
+        <div className="flex flex-row items-center gap-3">
+          <div className="flex flex-row items-center">
+            {isCreate && (account || user) && <HowToCreateGiftDialog />}
+
+            {userConnected && (
+              <Link href="/dashboard">
+                <Button
+                  className="flex items-center text-xs gap-2 bg-transparent hover:bg-neutral-100/10 text-white/90 px-3 h-8 rounded-lg font-semibold border-none hover:text-white"
+                  // className="flex items-center text-xs gap-2 bg-white hover:bg-neutral-100 text-black border border-gray-200 px-3 h-8 rounded-lg font-semibold shadow"
+                  type="button"
+                  variant="outline"
+                >
+                  Profile
+                </Button>
+              </Link>
+            )}
+          </div>
+          <ConnectButton className="font-semibold cursor-pointer text-white/50 hover:text-black/90 hover:bg-white/60 my-2 px-3 py-1 text-sm rounded-lg" />
         </div>
       </div>
     </header>
+  );
+}
+
+function HowToCreateGiftDialog() {
+  const [open, setOpen] = useState<boolean>(true);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          className="flex items-center text-xs gap-2 bg-transparent hover:bg-neutral-100/10 text-white/90 px-3 h-8 rounded-lg font-semibold border-none hover:text-white"
+          type="button"
+          variant="outline"
+        >
+          <CircleQuestionMark className="w-4 h-4" />
+          How to create gift
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md rounded-[24px] px-0 pb-0 pt-0 overflow-hidden">
+        <div className="flex flex-col gap-2 items-center text-center">
+          <DialogHeader className="w-full px-6 pt-8">
+            <DialogTitle className="text-lg font-semibold">
+              How to Create a Gift NFT
+            </DialogTitle>
+            <DialogDescription className="text-base text-muted-foreground">
+              Follow these steps to send a perfect gift!
+            </DialogDescription>
+          </DialogHeader>
+          <ol className="list-decimal list-inside space-y-2 mt-4 text-left text-base text-black px-7 pb-4 w-full">
+            <li>
+              <span className="font-semibold">Upload an image</span> — this
+              becomes your NFT gift.
+            </li>
+            <li>
+              <span className="font-semibold">Pick a delivery date</span> — when
+              your friend can open it.
+            </li>
+            <li>
+              <span className="font-semibold">Enter their email</span> — we'll
+              notify them when it's ready.
+            </li>
+            <li>
+              <span className="font-semibold">Add a SOL amount</span> — sent
+              along with the NFT.
+            </li>
+            <li>
+              <span className="font-semibold">Set a secret question</span> —
+              your friend answers it to claim the gift.
+            </li>
+          </ol>
+        </div>
+        <div className="border-t border-black/10 w-full">
+          <DialogClose asChild>
+            <button className="w-full cursor-pointer mx-auto text-blue-700 hover:text-blue-600 h-12 flex items-center justify-center font-medium transition-colors disabled:bg-muted/40 disabled:text-muted-foreground">
+              Got it!
+            </button>
+          </DialogClose>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

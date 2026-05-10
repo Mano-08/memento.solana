@@ -23,6 +23,8 @@ pub struct GiftCreated {
 pub struct CreateGift<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
+    #[account(mut)]
+    pub authorized_claimer: Signer<'info>,
     #[account(
         init_if_needed,
         payer = signer,
@@ -61,8 +63,9 @@ pub struct CreateGift<'info> {
     pub token_program: Interface<'info, TokenInterface>,
 }
 
-pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 32], sol_amount: u64, delivery_date: i64, authorized_claimer: Pubkey) -> Result<()> {
+pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], sol_amount: u64, delivery_date: i64) -> Result<()> {
     require!(sol_amount >= 1_000_000, GiftError::BelowMinimumAmount);
+    let authorized_claimer: Pubkey = ctx.accounts.authorized_claimer.key();
     require!(
         authorized_claimer != Pubkey::default(),
         GiftError::InvalidReceiver
@@ -70,10 +73,6 @@ pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 3
     require!(
         authorized_claimer != ctx.accounts.signer.key(),
         GiftError::CannotGiftToSelf 
-    );
-    require!(
-        answer_hash != [0u8; 32],
-        GiftError::InvalidAnswerHash
     );
     require!(
         salt != [0u8; 32],
@@ -97,7 +96,7 @@ pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 3
             || mint_authority == Option::Some(master_edition_pda).into(),
         GiftError::MintAuthorityNotRevoked
     );
-
+    
     let gift = &mut ctx.accounts.gift;
     let user = &mut ctx.accounts.user;
     gift.created_on = Clock::get()?.unix_timestamp as i64;
@@ -106,7 +105,6 @@ pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 3
         delivery_date >= (gift.created_on - TIMEZONE_BUFFER),
         GiftError::CannotGiftToPast
     );
-    gift.answer_hash = answer_hash;
     gift.nft_mint = mint.key();
     gift.salt = salt;
     gift.delivery_date = delivery_date;

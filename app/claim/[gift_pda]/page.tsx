@@ -19,7 +19,32 @@ import {
 } from "lucide-react";
 import { getAddMemoInstruction } from "@solana-program/memo";
 import { decryptQuestion, recursiveSha256 } from "@/app/helper/compute";
-import { RECURSIVE_HASH_DEPTH } from "@/app/helper/constants";
+
+import { REGEXP_ONLY_DIGITS } from "input-otp";
+
+import { Field, FieldLabel } from "@/components/ui/field";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
+
+function InputOTPPattern() {
+  return (
+    <Field className="w-fit">
+      <FieldLabel htmlFor="digits-only">Digits Only</FieldLabel>
+      <InputOTP id="digits-only" maxLength={4} pattern={REGEXP_ONLY_DIGITS}>
+        <InputOTPGroup>
+          <InputOTPSlot index={0} />
+          <InputOTPSlot index={1} />
+          <InputOTPSlot index={2} />
+          <InputOTPSlot index={3} />
+        </InputOTPGroup>
+      </InputOTP>
+    </Field>
+  );
+}
+
 import {
   fetchDigitalAsset,
   findAssociatedTokenPda,
@@ -56,7 +81,6 @@ import {
   createAuthorizedRecipientSigner,
   createPrivySigner,
 } from "@/app/lib/utils";
-import { WalletModal } from "@/app/components/wallet-modal";
 import { getTransferSolInstruction } from "@solana-program/system";
 import { Button } from "@/app/components/ui/button";
 import {
@@ -74,6 +98,7 @@ import { IconXmark } from "symbols-react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { signatureBytesToBase58 } from "@solana/connector";
 import CustomConfetti from "@/app/components/confetti";
+import { toast } from "sonner";
 
 const rpc = createSolanaRpc("https://api.devnet.solana.com");
 const rpcSubscriptions = createSolanaRpcSubscriptions(
@@ -88,10 +113,35 @@ enum ClaimGiftErrors {
   FAILED_TO_CLAIM_GIFT,
 }
 
+type GiftClaimedResponse = {
+  gift: Account<Gift, string>;
+  nft: { name: string; image: string };
+  signature: string;
+} | null;
+
+export enum GiftClaimStages {
+  VerifyAnswer = "verify_answer",
+  ClaimingGift = "claiming_gift",
+}
+
+export enum GiftClaimingStatus {
+  Loading = "loading",
+  Success = "success",
+  Error = "error",
+}
+
+export type GiftClaimStage = {
+  info?: string;
+  stage: GiftClaimStages;
+  status: GiftClaimingStatus;
+  errorMessage: string;
+};
+
 // const SOLGIFT_PROGRAM_ADDRESS: Address = idl.address as Address;
 
 // This page pulls the gift_pda from the URL, then sets up React state hooks
 export default function Page() {
+  const [giftClaimStage, setGiftClaimStage] = useState<GiftClaimStage[]>([]);
   const { ready, user, authenticated } = usePrivy();
   const {
     isConnected,
@@ -152,11 +202,7 @@ export default function Page() {
   );
   const [giftReceivedModalOpen, setGiftReceivedModalOpen] =
     useState<boolean>(false);
-  const [giftClaimed, setGiftClaimed] = useState<{
-    gift: Account<Gift, string>;
-    nft: { name: string; image: string };
-    signature: string;
-  } | null>(null);
+  const [giftClaimed, setGiftClaimed] = useState<GiftClaimedResponse>(null);
   console.log(cipher);
 
   // Fetch cipher and gift data
@@ -210,41 +256,24 @@ export default function Page() {
   async function claimGift(answer: string, signer: TransactionSigner<string>) {
     try {
       if (!(connectedToEmbeddedWallet || connectedToExternalWallet)) return;
-      if (!gift) return;
+      if (!gift) {
+        toast.error("Failed to fetch gift detials.");
+        throw new Error("Faield to fetch gift details.");
+      }
+
+      setGiftClaimStage((prev) => {
+        return [
+          ...prev,
+          {
+            errorMessage: "",
+            stage: GiftClaimStages.VerifyAnswer,
+            status: GiftClaimingStatus.Loading,
+          },
+        ];
+      });
+
       const salt = gift.data.salt;
-      const combined = new Uint8Array([
-        ...encoder.encode(answer),
-        ...encoder.encode(email.toString()),
-        ...salt,
-      ]);
-      const answerHash_n_1 = await recursiveSha256(
-        combined,
-        RECURSIVE_HASH_DEPTH - 1
-      );
-
-      const answerHash_n_2 = await recursiveSha256(
-        combined,
-        RECURSIVE_HASH_DEPTH - 2
-      );
-
-      const concatenatedHash = new Uint8Array(
-        answerHash_n_1.length + answerHash_n_2.length + salt.length
-      );
-      concatenatedHash.set(answerHash_n_1, 0);
-      concatenatedHash.set(answerHash_n_2, answerHash_n_1.length);
-      concatenatedHash.set(salt, answerHash_n_1.length + answerHash_n_2.length);
-
-      const nftMintseed = new Uint8Array(
-        await crypto.subtle.digest("SHA-256", concatenatedHash)
-      );
-
-      const nftMint = (
-        await createKeyPairSignerFromPrivateKeyBytes(nftMintseed)
-      ).address;
-      // const nftMint = gift.data.nftMint;
-
-      console.log(nftMint);
-      // await createKeyPairSignerFromPrivateKeyBytes(nftMintseed);
+      const nftMint = gift.data.nftMint;
 
       const combined_reverse = new Uint8Array([
         ...salt,
@@ -257,15 +286,47 @@ export default function Page() {
       );
       const authorizedClaimerKeypair =
         await createKeyPairSignerFromPrivateKeyBytes(new Uint8Array(seed));
-      const payer = createAuthorizedRecipientSigner(authorizedClaimerKeypair);
-      console.log(payer.address, "AUTHORAIZED CLAIMER");
 
-      if (payer.address !== gift.data.authorizedClaimer) {
-        throw new Error("UNAUTHORIZEDC LCAIMER");
-        return;
+      if (authorizedClaimerKeypair.address !== gift.data.authorizedClaimer) {
+        toast.error("Unauthorized claimer");
+        setGiftClaimStage((prev) => {
+          const idx = prev.findIndex(
+            (s) => s.stage === GiftClaimStages.VerifyAnswer
+          );
+          if (idx !== -1) {
+            // Update existing UploadingImage stage
+            const updated = [...prev];
+            updated[idx] = {
+              ...updated[idx],
+              errorMessage: "Incorrect answer",
+              status: GiftClaimingStatus.Error,
+            };
+            return updated;
+          }
+          // If not found, just return prev unchanged (or you may choose to push, but per instruction do not)
+          return prev;
+        });
+        throw new Error("Incorrect answer");
       }
-      console.log("ddd");
-      // setAuthorizedClaimer();
+      setGiftClaimStage((prev) => {
+        const idx = prev.findIndex(
+          (s) => s.stage === GiftClaimStages.VerifyAnswer
+        );
+        if (idx !== -1) {
+          // Update existing UploadingImage stage
+          const updated = [...prev];
+          updated[idx] = {
+            ...updated[idx],
+            errorMessage: "",
+            status: GiftClaimingStatus.Success,
+          };
+          return updated;
+        }
+        // If not found, just return prev unchanged (or you may choose to push, but per instruction do not)
+        return prev;
+      });
+      const payer = createAuthorizedRecipientSigner(authorizedClaimerKeypair);
+
       const [giftNftAta] = await findAssociatedTokenPda({
         mint: nftMint,
         owner: gift_pda as Address,
@@ -284,7 +345,7 @@ export default function Page() {
           nftMint: nftMint,
           giftNftAta: giftNftAta,
           assetRecipientNftAta: assetRecipientNftAta,
-          answerHash: answerHash_n_2,
+          // answerHash: answerHash_n_2,
         },
         "CLAIM GIFT INFOR"
       );
@@ -295,7 +356,6 @@ export default function Page() {
         nftMint: nftMint,
         giftNftAta: giftNftAta,
         assetRecipientNftAta: assetRecipientNftAta,
-        answerHashN1: answerHash_n_1,
       });
 
       console.log("NFT MINT ADDRSEE", nftMint);
@@ -304,6 +364,7 @@ export default function Page() {
 
       async function sendAndConfirm(options: {
         instructions: Instruction[];
+
         payer: TransactionSigner<string>;
       }) {
         const { instructions, payer } = options;
@@ -401,6 +462,7 @@ export default function Page() {
           logs.forEach((log: string, i: number) =>
             console.log(`  [${i}] ${log}`)
           );
+
           throw simErr;
         }
 
@@ -417,6 +479,24 @@ export default function Page() {
           setClaimGiftError(ClaimGiftErrors.FAILED_TO_CLAIM_GIFT);
           console.error("❌ Send failed:", err?.message);
           console.error("   Error code:", err?.context?.err);
+
+          setGiftClaimStage((prev) => {
+            const idx = prev.findIndex(
+              (s) => s.stage === GiftClaimStages.ClaimingGift
+            );
+            if (idx !== -1) {
+              // Update existing UploadingImage stage
+              const updated = [...prev];
+              updated[idx] = {
+                ...updated[idx],
+                errorMessage: "Couldnt Claim Gift, try again!",
+                status: GiftClaimingStatus.Error,
+              };
+              return updated;
+            }
+            // If not found, just return prev unchanged (or you may choose to push, but per instruction do not)
+            return prev;
+          });
 
           const logs: string[] = err?.context?.logs ?? [];
           if (logs.length) {
@@ -441,10 +521,38 @@ export default function Page() {
         return sig;
       }
 
-      // CLAIM GIFT KA FUNC
+      setGiftClaimStage((prev) => {
+        return [
+          ...prev,
+          {
+            errorMessage: "",
+            stage: GiftClaimStages.ClaimingGift,
+            status: GiftClaimingStatus.Loading,
+          },
+        ];
+      });
+
       const sx = await sendAndConfirm({
         instructions,
         payer: payer,
+      });
+
+      setGiftClaimStage((prev) => {
+        const idx = prev.findIndex(
+          (s) => s.stage === GiftClaimStages.ClaimingGift
+        );
+        if (idx !== -1) {
+          // Update existing UploadingImage stage
+          const updated = [...prev];
+          updated[idx] = {
+            ...updated[idx],
+            errorMessage: "",
+            status: GiftClaimingStatus.Success,
+          };
+          return updated;
+        }
+        // If not found, just return prev unchanged (or you may choose to push, but per instruction do not)
+        return prev;
       });
 
       setGiftReceivedModalOpen(true);
@@ -632,47 +740,41 @@ export default function Page() {
     }
   }
 
+  const [emailVerified, setEmailVerified] = useState<boolean>(false);
+
   return (
     <main
       className={`antialiased bg-custom-landing min-h-screen flex items-center justify-between py-20 px-6 w-screen overflow-x-hidden`}
     >
       <Modal closeGiftErrorModal={closeGiftErrorModal} error={claimGiftError} />
-      <GiftClaimedModal
+      {/* <GiftClaimedModal
         open={giftReceivedModalOpen}
         onOpenChange={(open: boolean) => setGiftReceivedModalOpen(open)}
         claimedGift={giftClaimed}
+      /> */}
+      <EmailOTPModal
+        decrypted={decrypted}
+        open={!emailVerified}
+        email={email}
+        handleSetRecipientEmail={handleSetRecipientEmail}
+        setEmailVerified={setEmailVerified}
       />
+      <LoadingClaimStagesModal
+        giftClaimStage={giftClaimStage}
+        giftClaimed={giftClaimed}
+        open={giftClaimStage.length !== 0}
+        onOpenChange={function (open: boolean): void {
+          throw new Error("Function not implemented.");
+        }}
+      />
+
       <form
         onSubmit={(e) => e.preventDefault()}
         className="md:max-w-xl mx-auto flex gap-6 md:w-auto w-full flex-col items-center"
       >
         <div
-          className={`md:min-w-[400px] flex flex-col gap-4 rounded-[44px] w-full`}
-        >
-          <fieldset className="flex w-full font-semibold text-sm flex-col gap-2 justify-between items-start bg-white p-3 rounded-lg">
-            <label
-              className="flex flex-row items-center gap-2 text-neutral-700 leading-none"
-              htmlFor="email"
-            >
-              <Mail size={16} /> Email
-            </label>
-            <div className="w-full rounded-lg bg-white">
-              <input
-                className="rounded-lg w-full shrink-0 text-left px-1.5 grow border-none text-sm py-2 leading-none text-neutral-800 outline-none bg-transparent"
-                id="email"
-                type="email"
-                value={email}
-                onChange={handleSetRecipientEmail}
-                placeholder="mark@gmail.com"
-                name="email"
-              />
-            </div>
-          </fieldset>
-        </div>
-
-        <div
-          className={`md:min-w-[400px] w-full flex flex-col gap-4 ${
-            !decrypted ? "opacity-50 cursor-not-allowed rounded-lg" : ""
+          className={`md:min-w-[400px] w-full flex flex-col gap-4 animate-slideUp delay-200! ${
+            !decrypted ? "opacity-30 cursor-not-allowed rounded-lg" : ""
           }`}
           style={{ pointerEvents: "auto" }}
           onMouseOver={(e) => {
@@ -682,10 +784,12 @@ export default function Page() {
             if (!decrypted) e.currentTarget.style.cursor = "";
           }}
         >
-          <fieldset className="flex w-full font-semibold text-sm flex-col gap-2 justify-between items-start bg-white p-3 rounded-lg">
+          <fieldset
+            className={`flex w-full font-semibold text-sm flex-col gap-2 justify-between items-start rounded-lg transition-transform duration-400 groupfocus-within:scale-105 bg-white p-3 md:focus-within:scale-110 md:focus-within:rounded-2xl md:focus-within:p-4`}
+          >
             <label
               className="flex flex-row items-center gap-2 text-neutral-700 leading-none"
-              htmlFor="email"
+              htmlFor="answer"
             >
               <Puzzle size={16} /> {decrypted ? decrypted : "A secret question"}
             </label>
@@ -705,37 +809,28 @@ export default function Page() {
           </fieldset>
         </div>
 
-        {wallet ? (
-          <ClaimGiftWithEmbeddedWallet
-            wallet={wallet}
-            handleClaimGift={handleClaimGift}
-            incorrectEmail={incorrectEmail}
-          />
-        ) : uiWalletAccount ? (
-          <ClaimGiftWithExternalWallet
-            uiWalletAccount={uiWalletAccount}
-            handleClaimGift={handleClaimGift}
-            incorrectEmail={incorrectEmail}
-          />
-        ) : (
-          <ConnectButton
-            text={"Connect Wallet to Claim Gift"}
-            className={`${decrypted ? "hover:bg-amber-400/90 bg-amber-400" : "hover:bg-amber-400/70 bg-amber-400/50"} font-semibold cursor-pointer text-black  my-2 px-3 py-2 text-sm rounded-lg w-full`}
-          />
-        )}
+        <div className="animate-slideUp delay-400! w-full">
+          {wallet ? (
+            <ClaimGiftWithEmbeddedWallet
+              wallet={wallet}
+              handleClaimGift={handleClaimGift}
+              incorrectEmail={incorrectEmail}
+            />
+          ) : uiWalletAccount ? (
+            <ClaimGiftWithExternalWallet
+              uiWalletAccount={uiWalletAccount}
+              handleClaimGift={handleClaimGift}
+              incorrectEmail={incorrectEmail}
+            />
+          ) : (
+            <ConnectButton
+              disabled={!decrypted}
+              text={"Connect Wallet to Claim Gift"}
+              className={`${decrypted ? "hover:bg-amber-400/90 bg-amber-400" : "hover:bg-amber-400/70 bg-amber-400/50 opacity-50"} font-semibold text-black my-2 px-3 py-2 text-sm rounded-lg w-full`}
+            />
+          )}
+        </div>
       </form>
-      <WalletModal
-        open={isModalOpen}
-        onOpenChange={(open) => {
-          setIsModalOpen(open);
-          // Clear WalletConnect URI when modal closes
-          if (!open) {
-            clearWalletConnectUri();
-          }
-        }}
-        walletConnectUri={walletConnectUri}
-        onClearWalletConnectUri={clearWalletConnectUri}
-      />
     </main>
   );
 }
@@ -887,7 +982,7 @@ function ClaimGiftButton({
       onClick={(e) => handleClaimGift(e, signer)}
       disabled={incorrectEmail}
       variant={"default"}
-      className="font-semibold cursor-pointer text-black  my-2 px-3 py-2 text-sm rounded-lg w-full bg-amber-400 hover:bg-amber-400/90"
+      className="font-semibold cursor-pointer text-black  my-2 px-3 py-2 text-sm rounded-lg w-full bg-lime-400 hover:bg-lime-400/90"
     >
       <span
         className="
@@ -916,83 +1011,343 @@ function ClaimGiftButton({
   );
 }
 
-function GiftClaimedModal({
+enum OtpRequestStatus {
+  IDLE = "request not initiated",
+  OTP_SENT_TO_EMAIL = "otp request sent",
+  FAILED_TO_SEND_OTP = "failed to send otp request",
+  OTP_DID_NOT_MATCH = "otp value did not match",
+  INVALID_OTP_TYPE = "otp must be 4 digit",
+  OTP_VERIFIED = "otp successfully verified",
+  FAILED_TO_VERIFY_OTP = "failed to verify otp",
+}
+
+function EmailOTPModal({
+  decrypted,
   open,
-  onOpenChange,
-  claimedGift,
+  email,
+  handleSetRecipientEmail,
+  setEmailVerified,
 }: {
+  decrypted: string;
+  open: boolean;
+  email: string;
+  setEmailVerified: React.Dispatch<React.SetStateAction<boolean>>;
+  handleSetRecipientEmail: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  const [otpVerificationStatus, setOtpVerificationStatus] =
+    useState<OtpRequestStatus>(OtpRequestStatus.IDLE);
+
+  async function requestOTP() {
+    if (!decrypted) return;
+    try {
+      const response = await fetch("/api/v1/otp/request");
+      if (response.ok) {
+        setOtpVerificationStatus(OtpRequestStatus.OTP_SENT_TO_EMAIL);
+      }
+    } catch (error) {
+      setOtpVerificationStatus(OtpRequestStatus.FAILED_TO_SEND_OTP);
+      console.error(error);
+    }
+  }
+
+  async function verifyOtp(otp_entered: number) {
+    if (
+      !otp_entered ||
+      typeof otp_entered !== "number" ||
+      otp_entered < 1000 ||
+      otp_entered > 9999
+    ) {
+      setOtpVerificationStatus(OtpRequestStatus.INVALID_OTP_TYPE);
+      console.error("OTP must be a 4-digit number.");
+      return;
+    }
+    try {
+      const response = await fetch("/api/v1/otp/verify");
+      if (response.ok) {
+        setOtpVerificationStatus(OtpRequestStatus.OTP_VERIFIED);
+      } else if (response.status === 410) {
+        setOtpVerificationStatus(OtpRequestStatus.OTP_DID_NOT_MATCH);
+      } else {
+        setOtpVerificationStatus(OtpRequestStatus.FAILED_TO_VERIFY_OTP);
+        console.error("Internal server error, status: " + response.status);
+      }
+    } catch (error) {
+      setOtpVerificationStatus(OtpRequestStatus.FAILED_TO_VERIFY_OTP);
+      console.error(error);
+    }
+  }
+
+  return (
+    <Dialog open={open}>
+      <DialogContent className="sm:max-w-md [&>button]:hidden rounded-[24px]">
+        <DialogHeader className="flex flex-row items-center justify-between px-7 pt-7">
+          <DialogTitle className="text-base text-left">
+            Verify Email
+          </DialogTitle>
+          {/* <DialogPrimitive.Close asChild>
+            <Button
+              variant="outline"
+              className="rounded-[16px] size-8 p-2 shrink-0 cursor-pointer"
+            >
+              <IconXmark className="size-3" />
+            </Button>
+          </DialogPrimitive.Close> */}
+        </DialogHeader>
+
+        <fieldset className="flex w-full font-semibold text-sm flex-col gap-2 justify-between items-start">
+          <label
+            className="flex flex-row items-center gap-2 text-neutral-700 leading-none"
+            htmlFor="email"
+          >
+            <Mail size={16} /> Email
+          </label>
+          <div className="w-full rounded-lg bg-white">
+            <input
+              className="rounded-lg w-full shrink-0 text-left px-1.5 grow border-none text-sm py-2 leading-none text-neutral-800 outline-none bg-transparent"
+              id="email"
+              type="email"
+              value={email}
+              onChange={handleSetRecipientEmail}
+              placeholder="mark@gmail.com"
+              name="email"
+            />
+          </div>
+        </fieldset>
+        {decrypted && <InputOTPPattern />}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// function GiftClaimedModal({
+//   open,
+//   onOpenChange,
+//   claimedGift,
+// }: {
+//   open: boolean;
+//   onOpenChange: (open: boolean) => void;
+//   claimedGift: {
+//     gift: Account<Gift, string>;
+//     nft: { name: string; image: string };
+//     signature: string;
+//   } | null;
+// }) {
+//   if (!claimedGift) return;
+//   // // ---- Testing only: inject random claimedGift ----
+//   // // Comment this out to restore production!
+//   // const fakeClaimedGift = {
+//   //   gift: {
+//   //     data: {
+//   //       solAmount: BigInt(Math.floor(Math.random() * 30 + 1) * 1e9), // random 1 ~ 30 SOL
+//   //       deliveryDate: BigInt(
+//   //         Math.floor(Date.now() / 1000) +
+//   //           3600 * 24 * Math.floor(Math.random() * 5)
+//   //       ), // random next 5 days
+//   //     },
+//   //   },
+//   //   nft: {
+//   //     name: `NFT #${Math.floor(Math.random() * 10000)}`,
+//   //     image:
+//   //       "https://picsum.photos/400/300?random=" +
+//   //       Math.floor(Math.random() * 1000),
+//   //   },
+//   //   signature: Math.random().toString(36).slice(2, 18),
+//   // };
+//   // const activeClaimedGift = fakeClaimedGift;
+//   const activeClaimedGift = claimedGift; // <-- use this for production!
+
+//   const gift = activeClaimedGift.gift;
+//   const signature = activeClaimedGift.signature;
+//   const nft = activeClaimedGift.nft;
+
+//   function formatSolAmount(amount: bigint): string {
+//     return (
+//       (Number(amount) / 1e9).toLocaleString(undefined, {
+//         minimumFractionDigits: 3,
+//         maximumFractionDigits: 3,
+//       }) + " SOL"
+//     );
+//   }
+
+//   function formatDate(bn: bigint) {
+//     if (!bn || bn === BigInt(0)) return "--";
+//     return new Date(Number(bn) * 1000).toLocaleDateString(undefined, {
+//       month: "short",
+//       day: "numeric",
+//       year: "numeric",
+//     });
+//   }
+
+//   const giftImage = nft.image;
+//   const giftName = nft.name;
+//   const solAmount =
+//     gift.data && gift.data.solAmount
+//       ? formatSolAmount(gift.data.solAmount)
+//       : "--";
+//   const deliveryDate =
+//     gift.data && gift.data.deliveryDate
+//       ? formatDate(gift.data.deliveryDate)
+//       : "--";
+
+//   return (
+//     <Dialog open={open} onOpenChange={onOpenChange}>
+//       <CustomConfetti />
+//       <DialogContent className="sm:max-w-md [&>button]:hidden rounded-[24px]">
+//         <DialogHeader className="flex flex-row items-center justify-between px-7 pt-7">
+//           <DialogTitle className="text-base text-left">
+//             Gift claimed successfully!
+//           </DialogTitle>
+//           <DialogPrimitive.Close asChild>
+//             <Button
+//               variant="outline"
+//               className="rounded-[16px] size-8 p-2 shrink-0 cursor-pointer"
+//             >
+//               <IconXmark className="size-3" />
+//             </Button>
+//           </DialogPrimitive.Close>
+//         </DialogHeader>
+
+//         <div className="flex flex-col items-center gap-4 px-7">
+//           <div className="w-full h-auto rounded-2xl overflow-hidden shadow border border-gray-200 mb-1 bg-white flex items-center justify-center">
+//             {giftImage ? (
+//               <img
+//                 src={giftImage}
+//                 alt={giftName}
+//                 className="w-full max-h-[350px] object-cover"
+//               />
+//             ) : (
+//               <div className="text-gray-300 flex items-center justify-center w-full h-full text-5xl">
+//                 🎁
+//               </div>
+//             )}
+//           </div>
+
+//           <div className="font-bold text-2xl text-black text-center">
+//             {giftName}
+//           </div>
+//           <div className="flex flex-col w-full gap-2 mt-2">
+//             <div className="flex flex-row items-center justify-between w-full text-black/90">
+//               <div className="flex items-center">
+//                 <Van className="w-5 h-5 mr-2" />
+//                 <span>Delivery Date</span>
+//               </div>
+//               <span className="font-medium">{deliveryDate}</span>
+//             </div>
+//             <div className="flex flex-row items-center justify-between w-full text-black/90">
+//               <div className="flex items-center">
+//                 <DollarSign className="w-5 h-5 mr-2" />
+//                 <span>Gift Amount</span>
+//               </div>
+//               <span className="font-medium">{solAmount}</span>
+//             </div>
+
+//             <Link
+//               href={`https://solscan.io/tx/${signature}?cluster=devnet`}
+//               target="_blank"
+//               className="flex flex-row items-center justify-between w-full text-black/90"
+//             >
+//               <div className="flex items-center">
+//                 <Check className="w-5 h-5 mr-2" />
+//                 <span>View Transaction</span>
+//               </div>
+//               <span className="font-medium break-all text-right max-w-[150px] text-violet-800">
+//                 {`${signature.slice(0, 4)}...${signature.slice(-4)}`}
+//               </span>
+//             </Link>
+
+//             <Link
+//               href="/dashboard"
+//               className="flex flex-row py-5 items-center justify-center w-full text-blue-600 border-t border-solid border-neutral-500 hover:text-blue-500 transition-colors duration-100 cursor-pointer"
+//             >
+//               View on Dashboard
+//             </Link>
+//           </div>
+//         </div>
+//       </DialogContent>
+//     </Dialog>
+//   );
+// }
+
+interface LoadingClaimStagesModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  claimedGift: {
-    gift: Account<Gift, string>;
-    nft: { name: string; image: string };
-    signature: string;
-  } | null;
-}) {
-  if (!claimedGift) return;
-  // // ---- Testing only: inject random claimedGift ----
-  // // Comment this out to restore production!
-  // const fakeClaimedGift = {
-  //   gift: {
-  //     data: {
-  //       solAmount: BigInt(Math.floor(Math.random() * 30 + 1) * 1e9), // random 1 ~ 30 SOL
-  //       deliveryDate: BigInt(
-  //         Math.floor(Date.now() / 1000) +
-  //           3600 * 24 * Math.floor(Math.random() * 5)
-  //       ), // random next 5 days
-  //     },
-  //   },
-  //   nft: {
-  //     name: `NFT #${Math.floor(Math.random() * 10000)}`,
-  //     image:
-  //       "https://picsum.photos/400/300?random=" +
-  //       Math.floor(Math.random() * 1000),
-  //   },
-  //   signature: Math.random().toString(36).slice(2, 18),
-  // };
-  // const activeClaimedGift = fakeClaimedGift;
-  const activeClaimedGift = claimedGift; // <-- use this for production!
+  giftClaimed: GiftClaimedResponse;
+  giftClaimStage: GiftClaimStage[];
+}
 
-  const gift = activeClaimedGift.gift;
-  const signature = activeClaimedGift.signature;
-  const nft = activeClaimedGift.nft;
+function LoadingClaimStagesModal({
+  open,
+  onOpenChange,
+  giftClaimed,
+  giftClaimStage,
+}: LoadingClaimStagesModalProps) {
+  if (!giftClaimed) return null;
 
-  function formatSolAmount(amount: bigint): string {
+  const stageLabels: { stage: GiftClaimStages; label: string }[] = [
+    { stage: GiftClaimStages.VerifyAnswer, label: "Verifying Answer" },
+    { stage: GiftClaimStages.ClaimingGift, label: "Claiming Gift" },
+  ];
+
+  function getStageInfo(stage: GiftClaimStages | string) {
+    return giftClaimStage.find((s) => s.stage === stage);
+  }
+
+  const firstError = giftClaimStage.find(
+    (s) => s.status === GiftClaimingStatus.Error && s.errorMessage
+  );
+
+  const isGiftClaimed = stageLabels.every(({ stage }) => {
+    const s = getStageInfo(stage);
+    return s && s.status === GiftClaimingStatus.Success;
+  });
+
+  function displayDeliveryDate(val: any) {
+    if (!val) return "--";
+    let numVal: number | undefined = undefined;
+    if (typeof val === "bigint") numVal = Number(val) * 1000;
+    else if (typeof val === "number") numVal = val * 1000;
+    else if (!isNaN(Number(val))) numVal = Number(val) * 1000;
+    const dt = numVal ? new Date(numVal) : new Date(val);
+    return dt.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+  function displaySolAmount(val: any) {
+    if (!val) return "--";
+    let amount: number;
+    if (typeof val === "bigint") amount = Number(val);
+    else if (typeof val === "string") amount = Number(val);
+    else amount = val;
+    if (amount > 1e7) amount /= 1e9; // lamports => sol
     return (
-      (Number(amount) / 1e9).toLocaleString(undefined, {
+      amount.toLocaleString(undefined, {
         minimumFractionDigits: 3,
         maximumFractionDigits: 3,
       }) + " SOL"
     );
   }
 
-  function formatDate(bn: bigint) {
-    if (!bn || bn === BigInt(0)) return "--";
-    return new Date(Number(bn) * 1000).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  }
-
-  const giftImage = nft.image;
-  const giftName = nft.name;
-  const solAmount =
-    gift.data && gift.data.solAmount
-      ? formatSolAmount(gift.data.solAmount)
-      : "--";
-  const deliveryDate =
-    gift.data && gift.data.deliveryDate
-      ? formatDate(gift.data.deliveryDate)
-      : "--";
+  const gift = giftClaimed.gift.data;
+  const nftMetadata = giftClaimed.nft;
+  const deliveryDate = gift.deliveryDate ?? "--";
+  const solAmount = gift.solAmount ?? "--";
+  const name = nftMetadata.name;
+  const image = nftMetadata.image;
+  const recipientEmail = "--"; // No email in Gift, dummy
+  const sender = gift.sender ?? "--";
+  const signature = giftClaimed.signature;
+  const createdOn = gift.createdOn;
+  const claimedOn = gift.claimedOn;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <CustomConfetti />
+      {isGiftClaimed && <CustomConfetti />}
       <DialogContent className="sm:max-w-md [&>button]:hidden rounded-[24px]">
         <DialogHeader className="flex flex-row items-center justify-between px-7 pt-7">
           <DialogTitle className="text-base text-left">
-            Gift claimed successfully!
+            {isGiftClaimed ? "Gift claimed successfully" : "Claiming Gift"}
           </DialogTitle>
           <DialogPrimitive.Close asChild>
             <Button
@@ -1003,63 +1358,188 @@ function GiftClaimedModal({
             </Button>
           </DialogPrimitive.Close>
         </DialogHeader>
-
-        <div className="flex flex-col items-center gap-4 px-7">
-          <div className="w-full h-auto rounded-2xl overflow-hidden shadow border border-gray-200 mb-1 bg-white flex items-center justify-center">
-            {giftImage ? (
-              <img
-                src={giftImage}
-                alt={giftName}
-                className="w-full max-h-[350px] object-cover"
-              />
-            ) : (
-              <div className="text-gray-300 flex items-center justify-center w-full h-full text-5xl">
-                🎁
+        {isGiftClaimed ? (
+          <>
+            <div className="flex flex-col items-center gap-4 px-7">
+              <div className="w-full h-auto rounded-2xl overflow-hidden shadow border border-gray-200 mb-1 bg-white flex items-center justify-center">
+                <div className="text-gray-300 flex items-center justify-center w-full h-full text-5xl">
+                  <img src={image} />
+                </div>
               </div>
-            )}
-          </div>
-
-          <div className="font-bold text-2xl text-black text-center">
-            {giftName}
-          </div>
-          <div className="flex flex-col w-full gap-2 mt-2">
-            <div className="flex flex-row items-center justify-between w-full text-black/90">
-              <div className="flex items-center">
-                <Van className="w-5 h-5 mr-2" />
-                <span>Delivery Date</span>
+              <div className="font-bold text-2xl text-black text-center">
+                {name}
               </div>
-              <span className="font-medium">{deliveryDate}</span>
+              <div className="flex flex-col w-full gap-2 mt-2">
+                <div className="flex flex-row items-center justify-between w-full text-black/90">
+                  <div className="flex items-center">
+                    <Van className="w-5 h-5 mr-2" />
+                    <span>Delivery Date</span>
+                  </div>
+                  <span className="font-medium">
+                    {displayDeliveryDate(deliveryDate)}
+                  </span>
+                </div>
+                <div className="flex flex-row items-center justify-between w-full text-black/90">
+                  <div className="flex items-center">
+                    <DollarSign className="w-5 h-5 mr-2" />
+                    <span>Gift Amount</span>
+                  </div>
+                  <span className="font-medium">
+                    {displaySolAmount(solAmount)}
+                  </span>
+                </div>
+                {/* Claim date (dummy for now) */}
+                <div className="flex flex-row items-center justify-between w-full text-black/90">
+                  <div className="flex items-center">
+                    <span className="inline-block w-5 h-5 mr-2" />
+                    <span>Claimed On</span>
+                  </div>
+                  <span className="font-medium">
+                    {claimedOn ? displayDeliveryDate(claimedOn) : "--"}
+                  </span>
+                </div>
+                {/* Email not available, show dummy */}
+                <div className="flex flex-row items-center justify-between w-full text-black/90">
+                  <div className="flex items-center">
+                    <span className="inline-block w-5 h-5 mr-2" />
+                    <span>Recipient Email</span>
+                  </div>
+                  <span className="font-medium break-all text-right max-w-[150px]">
+                    {recipientEmail}
+                  </span>
+                </div>
+                {/* Index/ID */}
+                <div className="flex flex-row items-center justify-between w-full text-black/90">
+                  <div className="flex items-center">
+                    <span className="inline-block w-5 h-5 mr-2" />
+                    <span>Gift ID</span>
+                  </div>
+                </div>
+
+                {signature && (
+                  <Link
+                    href={`https://solscan.io/tx/${signature}?cluster=devnet`}
+                    target="_blank"
+                    className="flex flex-row items-center justify-between w-full text-black/90"
+                  >
+                    <div className="flex items-center">
+                      <Check className="w-5 h-5 mr-2" />
+                      <span>Verify on Solscan</span>
+                    </div>
+                    <span className="font-medium break-all text-right max-w-[150px] text-violet-800">
+                      {`${signature.slice(0, 4)}...${signature.slice(-4)}`}
+                    </span>
+                  </Link>
+                )}
+                <Link
+                  href="/dashboard"
+                  className="flex flex-row py-5 items-center justify-center w-full text-blue-600 border-t border-solid border-neutral-500 hover:text-blue-500 transition-colors duration-100 cursor-pointer"
+                >
+                  View on Dashboard
+                </Link>
+              </div>
             </div>
-            <div className="flex flex-row items-center justify-between w-full text-black/90">
-              <div className="flex items-center">
-                <DollarSign className="w-5 h-5 mr-2" />
-                <span>Gift Amount</span>
-              </div>
-              <span className="font-medium">{solAmount}</span>
-            </div>
-
-            <Link
-              href={`https://solscan.io/tx/${signature}?cluster=devnet`}
-              target="_blank"
-              className="flex flex-row items-center justify-between w-full text-black/90"
-            >
-              <div className="flex items-center">
-                <Check className="w-5 h-5 mr-2" />
-                <span>View Transaction</span>
-              </div>
-              <span className="font-medium break-all text-right max-w-[150px] text-violet-800">
-                {`${signature.slice(0, 4)}...${signature.slice(-4)}`}
-              </span>
-            </Link>
-
-            <Link
-              href="/dashboard"
-              className="flex flex-row py-5 items-center justify-center w-full text-blue-600 border-t border-solid border-neutral-500 hover:text-blue-500 transition-colors duration-100 cursor-pointer"
-            >
-              View on Dashboard
-            </Link>
+          </>
+        ) : (
+          <div className="flex flex-col gap-3 items-start w-full px-7 pb-7">
+            {stageLabels.map(({ stage, label }) => {
+              const currentStageInfo = getStageInfo(stage);
+              const isLoading =
+                currentStageInfo?.status === GiftClaimingStatus.Loading;
+              let labelClasses = ["transition-colors", "duration-200"];
+              if (isLoading) {
+                labelClasses.push("opacity-100", "text-black", "font-bold");
+              } else {
+                labelClasses.push("text-sm", "text-black/50");
+              }
+              const isCompleted =
+                currentStageInfo?.status === GiftClaimingStatus.Success;
+              const notStarted = !currentStageInfo;
+              const isError =
+                currentStageInfo?.status === GiftClaimingStatus.Error;
+              return (
+                <div className="flex items-center gap-2.5" key={stage}>
+                  {isLoading ? (
+                    <span
+                      className="flex items-center justify-center"
+                      style={{ minWidth: "1.25rem", minHeight: "1.25rem" }}
+                    >
+                      <svg
+                        className="animate-spin h-5 w-5 text-gray-500"
+                        fill="none"
+                        viewBox="0 0 16 16"
+                      >
+                        <circle
+                          cx="8"
+                          cy="8"
+                          r="6"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          opacity="0.25"
+                        />
+                        <path
+                          d="M14 8a6 6 0 00-6-6"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </span>
+                  ) : (
+                    <span
+                      className={[
+                        "flex items-center justify-center h-5 w-5 rounded-full border-2 border-solid transition-all duration-200",
+                        isCompleted
+                          ? "bg-green-700 border-green-700"
+                          : notStarted
+                            ? "bg-neutral-200 border-neutral-200"
+                            : isError
+                              ? "bg-red-500 border-red-500"
+                              : "bg-gray-100 border-gray-100",
+                      ].join(" ")}
+                      style={{ minWidth: "1.25rem", minHeight: "1.25rem" }}
+                    >
+                      {isCompleted ? (
+                        <svg
+                          className="h-3 w-3 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          viewBox="0 0 16 16"
+                        >
+                          <path
+                            d="M4 8.5l3 3 5-5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      ) : isError ? (
+                        <svg
+                          className="h-3 w-3 text-white"
+                          fill="none"
+                          viewBox="0 0 16 16"
+                        >
+                          <path
+                            d="M4.7 4.7l6.6 6.6M4.7 11.3l6.6-6.6"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      ) : null}
+                    </span>
+                  )}
+                  <span className={labelClasses.join(" ")}>{label}</span>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        )}
+        {firstError && (
+          <div className="rounded-xl mt-2 p-3 mx-7 mb-7 text-xs border border-red-200 bg-red-50 text-black">
+            {firstError.errorMessage}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

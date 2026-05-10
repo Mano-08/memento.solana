@@ -12,12 +12,12 @@ declare_id!("Eb7kAScrjEpmxRmvSScSisev4VRWam7GserKaUTa12zq");
 pub mod solgift {
     use super::*;
 
-    pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 32], sol_amount: u64, delivery_date: i64, authorized_claimer: Pubkey) -> Result<()> {
-        handlers::create_gift::create_gift(ctx, salt, answer_hash, sol_amount, delivery_date, authorized_claimer)
+    pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], sol_amount: u64, delivery_date: i64) -> Result<()> {
+        handlers::create_gift::create_gift(ctx, salt, sol_amount, delivery_date)
     }
     
-    pub fn claim_gift(ctx: Context<ClaimGift>, answer_hash_n_1: [u8; 32]) -> Result<()> {
-        handlers::claim_gift::claim_gift(ctx, answer_hash_n_1)
+    pub fn claim_gift(ctx: Context<ClaimGift>) -> Result<()> {
+        handlers::claim_gift::claim_gift(ctx)
     }
 
     pub fn cancel_gift(ctx: Context<CancelGift>) -> Result<()> {
