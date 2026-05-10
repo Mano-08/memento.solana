@@ -122,8 +122,7 @@ export default function AppNav() {
             {userConnected && (
               <Link href="/dashboard">
                 <Button
-                  className="flex items-center text-xs gap-2 bg-transparent hover:bg-neutral-100/10 text-white/90 px-3 h-8 rounded-lg font-semibold border-none hover:text-white"
-                  // className="flex items-center text-xs gap-2 bg-white hover:bg-neutral-100 text-black border border-gray-200 px-3 h-8 rounded-lg font-semibold shadow"
+                  className="flex items-center text-sm gap-2 bg-transparent shadow-none hover:bg-neutral-100/10 text-white/50 px-3 h-8 rounded-lg font-semibold border-none hover:text-white/60"
                   type="button"
                   variant="outline"
                 >
@@ -132,7 +131,7 @@ export default function AppNav() {
               </Link>
             )}
           </div>
-          <ConnectButton className="font-semibold cursor-pointer text-white/50 hover:text-black/90 hover:bg-white/60 my-2 px-3 py-1 text-sm rounded-lg" />
+          <ConnectButton className="font-semibold shadow-none cursor-pointer text-white/50 hover:text-black/90 hover:bg-white/60 my-2 px-3 py-1 text-sm rounded-lg" />
         </div>
       </div>
     </header>
@@ -145,7 +144,7 @@ function HowToCreateGiftDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button
-          className="flex items-center text-xs gap-2 bg-transparent hover:bg-neutral-100/10 text-white/90 px-3 h-8 rounded-lg font-semibold border-none hover:text-white"
+          className="flex items-center text-sm gap-2 bg-transparent hover:bg-neutral-100/10 text-white/50 px-3 h-8 rounded-lg font-semibold border-none hover:text-white/60"
           type="button"
           variant="outline"
         >

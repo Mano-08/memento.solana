@@ -153,9 +153,9 @@ TODO;
 [DONE] 1.⁠ ⁠Connect wallet at /create
 [DONE] 2.⁠ ⁠Popup while gift creation
 
-/ - landing page (add shiny effect [P4])
-/create - toast errors [P4] + run simulation before pushing the image to Pinata [P1_DONE]
-/claim - OTP for end user [P1] + loading stage while gift information is fetched [P3] + display a blurred photo + delivery date when the gift can be claimed [P1]
+/ - landing page (add shiny effect [P4_DONE])
+/create - toast errors [P4_DONE] + run simulation before pushing the image to Pinata [P1_DONE]
+/claim - OTP for end user [P1_DONE] + loading stage while gift information is fetched [P3] + display a blurred photo + delivery date when the gift can be claimed [P1]
 /dashboard - update profile picture + name [P4]
 appnav - sign into supabase mandatory [P1_DONE]
 cancel_gift.rs - complete the code so people can cancel gift [P1]

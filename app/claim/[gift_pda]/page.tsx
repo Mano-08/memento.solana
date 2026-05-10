@@ -29,11 +29,23 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 
-function InputOTPPattern() {
+function InputOTPPattern({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <Field className="w-fit">
       <FieldLabel htmlFor="digits-only">Digits Only</FieldLabel>
-      <InputOTP id="digits-only" maxLength={4} pattern={REGEXP_ONLY_DIGITS}>
+      <InputOTP
+        id="digits-only"
+        maxLength={4}
+        pattern={REGEXP_ONLY_DIGITS}
+        value={value}
+        onChange={onChange}
+      >
         <InputOTPGroup>
           <InputOTPSlot index={0} />
           <InputOTPSlot index={1} />
@@ -67,6 +79,7 @@ import {
   KeyPairSigner,
   lamports,
   pipe,
+  ReadonlyUint8Array,
   sendAndConfirmTransactionFactory,
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
@@ -752,13 +765,18 @@ export default function Page() {
         onOpenChange={(open: boolean) => setGiftReceivedModalOpen(open)}
         claimedGift={giftClaimed}
       /> */}
-      <EmailOTPModal
-        decrypted={decrypted}
-        open={!emailVerified}
-        email={email}
-        handleSetRecipientEmail={handleSetRecipientEmail}
-        setEmailVerified={setEmailVerified}
-      />
+      {gift && (
+        <EmailOTPModal
+          decrypted={decrypted}
+          open={!emailVerified}
+          cipher={cipher}
+          email={email}
+          salt={gift.data.salt}
+          gift_pda={gift.address}
+          handleSetRecipientEmail={handleSetRecipientEmail}
+          setEmailVerified={setEmailVerified}
+        />
+      )}
       <LoadingClaimStagesModal
         giftClaimStage={giftClaimStage}
         giftClaimed={giftClaimed}
@@ -1024,45 +1042,109 @@ enum OtpRequestStatus {
 function EmailOTPModal({
   decrypted,
   open,
+  cipher,
   email,
   handleSetRecipientEmail,
   setEmailVerified,
+  salt,
+  gift_pda,
 }: {
   decrypted: string;
+  cipher: string;
   open: boolean;
   email: string;
+  salt: ReadonlyUint8Array<ArrayBufferLike>;
+  gift_pda: Address<string>;
   setEmailVerified: React.Dispatch<React.SetStateAction<boolean>>;
   handleSetRecipientEmail: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
   const [otpVerificationStatus, setOtpVerificationStatus] =
     useState<OtpRequestStatus>(OtpRequestStatus.IDLE);
+  const [otpRequested, setOtpRequested] = useState(false);
+  const [otpEntered, setOtpEntered] = useState<string>("");
+  // Helper: get message and error state from status
+  function getStatusBoxInfo(status: OtpRequestStatus) {
+    switch (status) {
+      case OtpRequestStatus.OTP_SENT_TO_EMAIL:
+        return {
+          message: "OTP has been sent to your email.",
+          isError: false,
+        };
+      case OtpRequestStatus.FAILED_TO_SEND_OTP:
+        return {
+          message: "Failed to send OTP. Please try again.",
+          isError: true,
+        };
+      case OtpRequestStatus.OTP_DID_NOT_MATCH:
+        return {
+          message: "Incorrect OTP. Please check the code and try again.",
+          isError: true,
+        };
+      case OtpRequestStatus.OTP_VERIFIED:
+        return {
+          message: "OTP verified successfully!",
+          isError: false,
+        };
+      case OtpRequestStatus.INVALID_OTP_TYPE:
+        return {
+          message: "OTP must be a 4-digit number.",
+          isError: true,
+        };
+      case OtpRequestStatus.FAILED_TO_VERIFY_OTP:
+        return {
+          message: "Failed to verify OTP. Please try again.",
+          isError: true,
+        };
+      default:
+        return null;
+    }
+  }
 
   async function requestOTP() {
     if (!decrypted) return;
     try {
-      const response = await fetch("/api/v1/otp/request");
+      // Here sample: adjust params as needed
+      try {
+        const s = await decryptQuestion(cipher, new Uint8Array(salt), email);
+        console.log("FFI", s);
+      } catch (error) {
+        console.log("FIO", error);
+      }
+      const response = await fetch("/api/v1/otp/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          salt: Buffer.from(salt).toString("base64"),
+          gift_pda,
+        }),
+      });
       if (response.ok) {
         setOtpVerificationStatus(OtpRequestStatus.OTP_SENT_TO_EMAIL);
+        setOtpRequested(true);
       }
     } catch (error) {
       setOtpVerificationStatus(OtpRequestStatus.FAILED_TO_SEND_OTP);
+      setOtpRequested(false);
       console.error(error);
     }
   }
 
-  async function verifyOtp(otp_entered: number) {
-    if (
-      !otp_entered ||
-      typeof otp_entered !== "number" ||
-      otp_entered < 1000 ||
-      otp_entered > 9999
-    ) {
+  async function verifyOtp() {
+    if (!/^\d{4}$/.test(otpEntered)) {
       setOtpVerificationStatus(OtpRequestStatus.INVALID_OTP_TYPE);
-      console.error("OTP must be a 4-digit number.");
+      console.error("OTP must be a 4-digit numeric value (0000-9999).");
       return;
     }
     try {
-      const response = await fetch("/api/v1/otp/verify");
+      const response = await fetch("/api/v1/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          code: otpEntered,
+        }),
+      });
       if (response.ok) {
         setOtpVerificationStatus(OtpRequestStatus.OTP_VERIFIED);
       } else if (response.status === 410) {
@@ -1077,6 +1159,8 @@ function EmailOTPModal({
     }
   }
 
+  const statusBox = getStatusBoxInfo(otpVerificationStatus);
+
   return (
     <Dialog open={open}>
       <DialogContent className="sm:max-w-md [&>button]:hidden rounded-[24px]">
@@ -1084,14 +1168,6 @@ function EmailOTPModal({
           <DialogTitle className="text-base text-left">
             Verify Email
           </DialogTitle>
-          {/* <DialogPrimitive.Close asChild>
-            <Button
-              variant="outline"
-              className="rounded-[16px] size-8 p-2 shrink-0 cursor-pointer"
-            >
-              <IconXmark className="size-3" />
-            </Button>
-          </DialogPrimitive.Close> */}
         </DialogHeader>
 
         <fieldset className="flex w-full font-semibold text-sm flex-col gap-2 justify-between items-start">
@@ -1113,7 +1189,50 @@ function EmailOTPModal({
             />
           </div>
         </fieldset>
-        {decrypted && <InputOTPPattern />}
+        {decrypted && (
+          <InputOTPPattern
+            value={otpEntered}
+            onChange={function (value: string): void {
+              setOtpEntered(value);
+            }}
+          />
+        )}
+        {statusBox && (
+          <div
+            className={`w-full mt-4 px-3 py-2 rounded-md border text-sm ${
+              statusBox.isError
+                ? "border-red-300 bg-red-50 text-red-700"
+                : "border-lime-300 bg-lime-50 text-lime-800"
+            }`}
+            data-testid="otp-status-box"
+          >
+            {statusBox.message}
+          </div>
+        )}
+        {decrypted !== "" && (
+          <div className="w-full flex justify-end mt-4">
+            {!otpRequested ? (
+              <button
+                type="button"
+                className="px-4 py-2 rounded-md bg-lime-400 hover:bg-lime-400/90 font-semibold text-black text-sm"
+                onClick={requestOTP}
+              >
+                Request OTP
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="px-4 py-2 rounded-md bg-lime-400 hover:bg-lime-400/90 font-semibold text-black text-sm"
+                // For demo, this just focuses the next step; you should wire in a prompt for user to enter OTP, etc.
+                onClick={() => {
+                  verifyOtp();
+                }}
+              >
+                Verify OTP
+              </button>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

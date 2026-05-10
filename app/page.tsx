@@ -1,5 +1,6 @@
 import "@radix-ui/themes/styles.css";
 import Link from "next/link";
+import { Sparkle } from "lucide-react";
 import Image from "next/image";
 import solanaLogoMark from "@/public/solanaLogoMark.svg";
 import solanaWordMark from "@/public/solanaWordMark.svg";
@@ -9,25 +10,26 @@ import helpingHandImage from "@/public/helping-hand.png";
 import { bricolage } from "./fonts/fonts";
 import Footer from "./components/footer";
 import { Button } from "./components/ui/button";
+import { SparkleCluster } from "./components/stars";
 
 export default function Home() {
   return (
     <>
       <main className="min-h-screen flex flex-col items-center justify-center w-screen overflow-x-hidden">
-        <section className="min-h-screen py-10 bg-custom-landing w-full flex items-center justify-center">
+        <section className="min-h-screen py-10 bg-custom-landing w-full flex items-center justify-center ">
           <div className="flex-col-reverse md:flex-row flex items-center justify-center max-w-5xl w-full gap-20">
             <div className="flex flex-col justify-center items-center md:items-start">
               <h1
                 className={`text-4xl md:text-7xl text-center md:text-left w-full md:w-auto ${bricolage.className}`}
               >
-                <span className="block animate-slideUp text-neutral-500 ">
+                <span className="block  text-neutral-500 ">
                   Thoughtful <br className="md:block hidden" /> gifts <br />
                   {/* <span className="text-colored">start here.</span> */}
-                  <span className="text-neutral-400">start here.</span>
+                  <SparkleCluster />
                 </span>
               </h1>
               <div
-                className={`text-sm md:text-lg mt-2 delay-200! animate-slideUp text-neutral-500 max-w-2xl text-center md:text-left font-medium`}
+                className={`text-sm md:text-lg mt-2  text-neutral-500 max-w-2xl text-center md:text-left font-medium`}
               >
                 Send an NFT, set the unlock date, and surprise someone special.
                 Make moments memorable on-chain.
@@ -36,7 +38,7 @@ export default function Home() {
               <div className="flex flex-col items-center gap-4 max-w-[300px] mt-8">
                 <Button
                   variant={"default"}
-                  className="font-semibold delay-400! animate-slideUp w-full rounded-lg bg-white hover:bg-white/90 h-12 text-black group overflow-hidden relative"
+                  className="font-semibold  w-full rounded-lg bg-white hover:bg-white/90 h-12 text-black group overflow-hidden relative"
                 >
                   <Link
                     href="/create"
@@ -45,7 +47,7 @@ export default function Home() {
                     Gift now!
                   </Link>
                 </Button>
-                <p className="inline-flex gap-2 group text-xs md:text-sm delay-600! animate-slideUp text-white/80">
+                <p className="inline-flex gap-2 group text-xs md:text-sm  text-white/80">
                   <span>powered by</span>
                   <Image
                     src={solanaLogoMark}
@@ -76,7 +78,6 @@ export default function Home() {
                       origin-70%_80%
                       group-hover:-translate-y-7
                       group-hover:-translate-x-64
-                     animate-slideUp
                     "
                   >
                     <Image
@@ -99,7 +100,6 @@ export default function Home() {
                       [box-shadow:0_8px_32px_rgba(0,0,0,0.16),0_2px_8px_rgba(0,0,0,0.08)]
                       origin-70%_80%
                       group-hover:translate-y-8
-                      animate-slideUp
                     "
                   >
                     <Image
