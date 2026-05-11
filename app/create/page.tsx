@@ -305,13 +305,51 @@ export default function CreateGiftForm() {
             setImageFile={setImageFile}
           />
 
-          <fieldset className="flex w-full font-semibold text-sm flex-row justify-between items-center py-3.5 bg-white/5 px-3 rounded-lg">
+          {/* <fieldset className="flex w-full font-semibold text-sm flex-row justify-between items-center py-3.5 bg-white/5 px-3 rounded-lg">
             <label
               className="flex flex-row items-center gap-2 text-neutral-400 leading-none"
               htmlFor="giftAmount"
             >
               <Sparkles size={16} /> Modify image with AI
             </label>
+          </fieldset> */}
+          <fieldset
+            className={`${giftInputError === GiftInputError.gift_amount && "shaky"} flex w-full font-semibold text-sm flex-row justify-between items-center bg-white/5 py-1 px-3 rounded-lg`}
+          >
+            <label
+              className="flex flex-row items-center gap-2 text-neutral-400 leading-none"
+              htmlFor="giftAmount"
+            >
+              <DollarSign size={16} /> Gift Amount
+              <HoverCard>
+                <HoverCardTrigger asChild>
+                  <span
+                    className="w-4 h-4 flex items-center justify-center rounded-full cursor-pointer transition-colors text-neutral-5500 hover:text-neutral-200"
+                    tabIndex={0}
+                  >
+                    <CircleQuestionMark size={14} />
+                  </span>
+                </HoverCardTrigger>
+                <HoverCardContent className="text-xs py-2 px-3 rounded-xl bg-white/95 text-black shadow">
+                  The SOL amount your friend will be able to withdraw or claim
+                  along with the NFT.
+                </HoverCardContent>
+              </HoverCard>
+            </label>
+
+            <div>
+              <input
+                className="rounded-md shrink-0 grow text-right border-none py-2.5 leading-none text-neutral-300 outline-none"
+                id="giftAmount"
+                min={0}
+                step="any"
+                value={createGiftData.giftAmount}
+                onChange={handleSetGiftAmount}
+                type="number"
+                name="giftAmount"
+              />{" "}
+              <span className="text-neutral-300">SOL</span>
+            </div>
           </fieldset>
         </div>
 
@@ -427,45 +465,6 @@ export default function CreateGiftForm() {
               placeholder="mark@gmail.com"
               name="email"
             />
-          </fieldset>
-
-          <fieldset
-            className={`${giftInputError === GiftInputError.gift_amount && "shaky"} flex w-full font-semibold text-sm flex-row justify-between items-center bg-white/5 py-1 px-3 rounded-lg`}
-          >
-            <label
-              className="flex flex-row items-center gap-2 text-neutral-400 leading-none"
-              htmlFor="giftAmount"
-            >
-              <DollarSign size={16} /> Gift Amount
-              <HoverCard>
-                <HoverCardTrigger asChild>
-                  <span
-                    className="w-4 h-4 flex items-center justify-center rounded-full cursor-pointer transition-colors text-neutral-5500 hover:text-neutral-200"
-                    tabIndex={0}
-                  >
-                    <CircleQuestionMark size={14} />
-                  </span>
-                </HoverCardTrigger>
-                <HoverCardContent className="text-xs py-2 px-3 rounded-xl bg-white/95 text-black shadow">
-                  The SOL amount your friend will be able to withdraw or claim
-                  along with the NFT.
-                </HoverCardContent>
-              </HoverCard>
-            </label>
-
-            <div>
-              <input
-                className="rounded-md shrink-0 grow text-right border-none py-2.5 leading-none text-neutral-300 outline-none"
-                id="giftAmount"
-                min={0}
-                step="any"
-                value={createGiftData.giftAmount}
-                onChange={handleSetGiftAmount}
-                type="number"
-                name="giftAmount"
-              />{" "}
-              <span className="text-neutral-300">SOL</span>
-            </div>
           </fieldset>
 
           <div

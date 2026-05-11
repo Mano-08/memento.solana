@@ -12,7 +12,7 @@ import { Toaster } from "@/components/ui/sonner";
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "SolGift",
+  title: "Memento",
   description: "Gift Time Locked Solana NFT!",
   icons: {
     icon: "/icon.svg",

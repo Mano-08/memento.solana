@@ -55,7 +55,7 @@ export default function AppNav() {
     brandLabel = "Claim gift";
   } else {
     BrandIcon = null;
-    brandLabel = "SolGift";
+    brandLabel = "Memento";
   }
 
   const { ready, user, authenticated } = usePrivy();

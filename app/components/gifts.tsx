@@ -1,5 +1,14 @@
 "use client";
 
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from "@/app/components/ui/dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Tabs } from "radix-ui";
 import {
@@ -51,7 +60,11 @@ import {
   fetchDigitalAsset,
   findAssociatedTokenPda,
 } from "@metaplex-foundation/mpl-token-metadata-kit";
-import { formatDate, u16ToLeBytes } from "@/app/helper/compute";
+import {
+  decryptQuestion,
+  formatDate,
+  u16ToLeBytes,
+} from "@/app/helper/compute";
 import { useConnector } from "@solana/connector/react";
 import { usePrivy } from "@privy-io/react-auth";
 import {
@@ -60,6 +73,8 @@ import {
   Copy,
   DollarSign,
   EllipsisVertical,
+  LockKeyhole,
+  Mail,
   PackageCheck,
   UserRoundCheck,
   Van,
@@ -280,10 +295,55 @@ function GiftsSection({
       setLoadingSent(false);
     }
   }
-  const [email, setEmail] = useState<string>("laura@gmail.com");
-  const [answer, setAnswer] = useState<string>("linkinpark");
+  const [email, setEmail] = useState<string>("");
+  const [answer, setAnswer] = useState<string>("");
+  const [cancelGift, setCancelGift] = useState<GiftAndNFTData | null>(null);
+  const [cipher, setCipher] = useState<string>("");
+  const [decrypted, setDecrypted] = useState<string>("");
 
-  async function cancelGift({ gift }: { gift: GiftAndNFTData }) {
+  async function handleDecryptQuestion(email: string) {
+    try {
+      if (!cancelGift) return;
+      const res = await decryptQuestion(
+        cipher,
+        new Uint8Array(cancelGift.giftData.salt),
+        email
+      );
+      setDecrypted(res);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  useEffect(() => {
+    handleDecryptQuestion(email);
+  }, [email]);
+
+  async function confirmCancelGift({ gift }: { gift: GiftAndNFTData }) {
+    setCancelGift(gift);
+    try {
+      const response = await fetch(`/api/v1/gifts/${gift.giftPda}`, {
+        method: "GET",
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData);
+      }
+      const dbData = await response.json();
+      setCipher(dbData.data.security_question || "");
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  function setCancelGiftDialogOpen() {
+    setCancelGift(null);
+    setEmail("");
+    setAnswer("");
+  }
+
+  async function handleCancelGift() {
+    const gift = cancelGift;
+    if (!gift) return;
     console.log(
       gift,
       GiftStatus.Cancelled,
@@ -296,8 +356,8 @@ function GiftsSection({
         const salt = gift.giftData.salt;
         const combined_reverse = new Uint8Array([
           ...salt,
-          ...encoder.encode("laura@gmail.com"),
-          ...encoder.encode("linkinpark"),
+          ...encoder.encode(email),
+          ...encoder.encode(answer),
         ]);
 
         const seed = new Uint8Array(
@@ -308,7 +368,6 @@ function GiftsSection({
         const authorizedClaimerSigner = createAuthorizedRecipientSigner(
           authorizedClaimerKeypair
         );
-        const authorizedClaimer = authorizedClaimerKeypair.address;
         const instructions = [];
 
         console.log(gift, "PINOG PO");
@@ -531,8 +590,102 @@ function GiftsSection({
     }
   }
 
+  function handleSetSecurityAnswer(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value;
+    // Allow only English letters, ignore numbers, specials, spaces
+    // Convert to lower case, filter only a-z using charCode
+    let filtered = "";
+    for (let i = 0; i < raw.length; i++) {
+      let c = raw[i];
+      // Get char code
+      let code = c.charCodeAt(0);
+      // If upper case A-Z: 65-90, convert to lower case
+      if (code >= 65 && code <= 90) {
+        c = c.toLowerCase();
+        code = c.charCodeAt(0);
+      }
+      // Allow only lower case a-z: 97-122
+      if (code >= 97 && code <= 122) {
+        filtered += c;
+      }
+    }
+    setAnswer(filtered);
+  }
+
   return (
     <Tabs.Root className="flex w-full flex-col" defaultValue="sent">
+      <Dialog open={cancelGift !== null} onOpenChange={setCancelGiftDialogOpen}>
+        <DialogContent className="lg:max-w-md [&>button]:hidden rounded-[24px]">
+          <DialogHeader className="flex flex-row items-center justify-between px-7 pt-7">
+            <DialogTitle className="text-base text-left">
+              Cancel Gift
+            </DialogTitle>
+          </DialogHeader>
+          <fieldset
+            className={`flex w-full font-semibold text-sm flex-col gap-2 justify-between items-start px-7`}
+          >
+            <label
+              className="flex flex-row items-center gap-2 text-neutral-500 leading-none"
+              htmlFor="cancelGiftEmail"
+            >
+              <Mail size={16} /> Email
+            </label>
+            <div className="w-full rounded-lg bg-white">
+              <input
+                className={`
+                  rounded-lg w-full shrink-0 text-left px-1.5 grow border text-sm py-2 leading-none text-neutral-800 bg-transparent
+                  border-neutral-300
+                  focus:outline-none focus:ring-2 focus:ring-neutral-200 focus:border-neutral-200
+                  transition
+                `}
+                id="cancelGiftEmail"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Recipient Email Address"
+                name="cancelGiftEmail"
+              />
+            </div>
+          </fieldset>
+          {decrypted && (
+            <fieldset
+              className={`flex w-full font-semibold text-sm flex-col gap-2 justify-between items-start px-7`}
+            >
+              <label
+                className="flex flex-row items-center gap-2 text-neutral-500 leading-none"
+                htmlFor="cancelGiftAnswer"
+              >
+                <LockKeyhole size={16} /> {decrypted}
+              </label>
+              <div className="w-full rounded-lg bg-white">
+                <input
+                  className={`
+                  rounded-lg w-full shrink-0 text-left px-1.5 grow border text-sm py-2 leading-none text-neutral-800 bg-transparent
+                  border-neutral-300
+                  focus:outline-none focus:ring-2 focus:ring-neutral-200 focus:border-neutral-200
+                  transition
+                `}
+                  id="cancelGiftAnswer"
+                  type="text"
+                  value={answer}
+                  onChange={handleSetSecurityAnswer}
+                  placeholder="answer to security question"
+                  name="cancelGiftAnswer"
+                />
+              </div>
+            </fieldset>
+          )}
+          <div className="w-full flex justify-end mt-2">
+            <button
+              type="button"
+              className="py-5 w-full disabled:cursor-not-allowed disabled:text-red-300 text-red-600 hover:text-red-500 font-semibold cursor-pointer border-t border-solid border-neutral-400 text-sm flex flex-row items-center justify-center gap-2"
+              onClick={handleCancelGift}
+            >
+              Cancel Gift
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Tabs.List
         className="flex shrink-0 border-b border-mauve6"
         aria-label="Manage your account"
@@ -570,7 +723,7 @@ function GiftsSection({
                 received={false}
                 key={gift.giftPda}
                 handleCancelGift={() => {
-                  cancelGift({ gift });
+                  confirmCancelGift({ gift });
                 }}
               />
             ))

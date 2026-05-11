@@ -7,7 +7,7 @@ export default function Navbar() {
         <div>
           Copyright &copy; 2026{" "}
           <Link href="/" className="text-black hover:underline cursor-pointer">
-            SolGift
+            Memento
           </Link>
           . All rights reserved.
         </div>
