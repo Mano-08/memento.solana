@@ -19,3 +19,18 @@ export function createClient() {
     // }
   );
 }
+
+import { decode } from "jsonwebtoken";
+
+async function hi() {
+  const supabase = createClient();
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+
+  if (accessToken) {
+    const claims = decode(accessToken);
+    console.log("CLAIMS", claims);
+  }
+}
+
+hi();

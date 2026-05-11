@@ -10,7 +10,7 @@ export async function uploadImageToPinata(imageFile: File) {
   try {
     const formData = new FormData();
     formData.append("file", imageFile);
-    const res = await fetch("/api/v1/pinata/upload/image", {
+    const res = await fetch("/api/v1/upload/image", {
       method: "POST",
       body: formData,
     });

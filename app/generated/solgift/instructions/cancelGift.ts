@@ -50,11 +50,10 @@ export function getCancelGiftDiscriminatorBytes() {
 export type CancelGiftInstruction<
   TProgram extends string = typeof SOLGIFT_PROGRAM_ADDRESS,
   TAccountSigner extends string | AccountMeta<string> = string,
-  TAccountUser extends string | AccountMeta<string> = string,
+  TAccountAuthorizedClaimer extends string | AccountMeta<string> = string,
   TAccountGift extends string | AccountMeta<string> = string,
   TAccountGiftNftAta extends string | AccountMeta<string> = string,
   TAccountNftMint extends string | AccountMeta<string> = string,
-  TAccountSender extends string | AccountMeta<string> = string,
   TAccountTokenProgram extends string | AccountMeta<string> =
     "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
   TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
@@ -68,9 +67,10 @@ export type CancelGiftInstruction<
         ? WritableSignerAccount<TAccountSigner> &
             AccountSignerMeta<TAccountSigner>
         : TAccountSigner,
-      TAccountUser extends string
-        ? WritableAccount<TAccountUser>
-        : TAccountUser,
+      TAccountAuthorizedClaimer extends string
+        ? WritableSignerAccount<TAccountAuthorizedClaimer> &
+            AccountSignerMeta<TAccountAuthorizedClaimer>
+        : TAccountAuthorizedClaimer,
       TAccountGift extends string
         ? WritableAccount<TAccountGift>
         : TAccountGift,
@@ -78,11 +78,8 @@ export type CancelGiftInstruction<
         ? WritableAccount<TAccountGiftNftAta>
         : TAccountGiftNftAta,
       TAccountNftMint extends string
-        ? ReadonlyAccount<TAccountNftMint>
+        ? WritableAccount<TAccountNftMint>
         : TAccountNftMint,
-      TAccountSender extends string
-        ? ReadonlyAccount<TAccountSender>
-        : TAccountSender,
       TAccountTokenProgram extends string
         ? ReadonlyAccount<TAccountTokenProgram>
         : TAccountTokenProgram,
@@ -122,42 +119,38 @@ export function getCancelGiftInstructionDataCodec(): FixedSizeCodec<
 
 export type CancelGiftAsyncInput<
   TAccountSigner extends string = string,
-  TAccountUser extends string = string,
+  TAccountAuthorizedClaimer extends string = string,
   TAccountGift extends string = string,
   TAccountGiftNftAta extends string = string,
   TAccountNftMint extends string = string,
-  TAccountSender extends string = string,
   TAccountTokenProgram extends string = string,
   TAccountAssociatedTokenProgram extends string = string,
 > = {
   signer: TransactionSigner<TAccountSigner>;
-  user?: Address<TAccountUser>;
+  authorizedClaimer: TransactionSigner<TAccountAuthorizedClaimer>;
   gift: Address<TAccountGift>;
   giftNftAta?: Address<TAccountGiftNftAta>;
   nftMint: Address<TAccountNftMint>;
-  sender: Address<TAccountSender>;
   tokenProgram?: Address<TAccountTokenProgram>;
   associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
 };
 
 export async function getCancelGiftInstructionAsync<
   TAccountSigner extends string,
-  TAccountUser extends string,
+  TAccountAuthorizedClaimer extends string,
   TAccountGift extends string,
   TAccountGiftNftAta extends string,
   TAccountNftMint extends string,
-  TAccountSender extends string,
   TAccountTokenProgram extends string,
   TAccountAssociatedTokenProgram extends string,
   TProgramAddress extends Address = typeof SOLGIFT_PROGRAM_ADDRESS,
 >(
   input: CancelGiftAsyncInput<
     TAccountSigner,
-    TAccountUser,
+    TAccountAuthorizedClaimer,
     TAccountGift,
     TAccountGiftNftAta,
     TAccountNftMint,
-    TAccountSender,
     TAccountTokenProgram,
     TAccountAssociatedTokenProgram
   >,
@@ -166,11 +159,10 @@ export async function getCancelGiftInstructionAsync<
   CancelGiftInstruction<
     TProgramAddress,
     TAccountSigner,
-    TAccountUser,
+    TAccountAuthorizedClaimer,
     TAccountGift,
     TAccountGiftNftAta,
     TAccountNftMint,
-    TAccountSender,
     TAccountTokenProgram,
     TAccountAssociatedTokenProgram
   >
@@ -181,11 +173,13 @@ export async function getCancelGiftInstructionAsync<
   // Original accounts.
   const originalAccounts = {
     signer: { value: input.signer ?? null, isWritable: true },
-    user: { value: input.user ?? null, isWritable: true },
+    authorizedClaimer: {
+      value: input.authorizedClaimer ?? null,
+      isWritable: true,
+    },
     gift: { value: input.gift ?? null, isWritable: true },
     giftNftAta: { value: input.giftNftAta ?? null, isWritable: true },
-    nftMint: { value: input.nftMint ?? null, isWritable: false },
-    sender: { value: input.sender ?? null, isWritable: false },
+    nftMint: { value: input.nftMint ?? null, isWritable: true },
     tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
     associatedTokenProgram: {
       value: input.associatedTokenProgram ?? null,
@@ -198,15 +192,6 @@ export async function getCancelGiftInstructionAsync<
   >;
 
   // Resolve default values.
-  if (!accounts.user.value) {
-    accounts.user.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(new Uint8Array([117, 115, 101, 114])),
-        getAddressEncoder().encode(expectAddress(accounts.signer.value)),
-      ],
-    });
-  }
   if (!accounts.giftNftAta.value) {
     accounts.giftNftAta.value = await getProgramDerivedAddress({
       programAddress:
@@ -237,11 +222,10 @@ export async function getCancelGiftInstructionAsync<
   return Object.freeze({
     accounts: [
       getAccountMeta(accounts.signer),
-      getAccountMeta(accounts.user),
+      getAccountMeta(accounts.authorizedClaimer),
       getAccountMeta(accounts.gift),
       getAccountMeta(accounts.giftNftAta),
       getAccountMeta(accounts.nftMint),
-      getAccountMeta(accounts.sender),
       getAccountMeta(accounts.tokenProgram),
       getAccountMeta(accounts.associatedTokenProgram),
     ],
@@ -250,11 +234,10 @@ export async function getCancelGiftInstructionAsync<
   } as CancelGiftInstruction<
     TProgramAddress,
     TAccountSigner,
-    TAccountUser,
+    TAccountAuthorizedClaimer,
     TAccountGift,
     TAccountGiftNftAta,
     TAccountNftMint,
-    TAccountSender,
     TAccountTokenProgram,
     TAccountAssociatedTokenProgram
   >);
@@ -262,42 +245,38 @@ export async function getCancelGiftInstructionAsync<
 
 export type CancelGiftInput<
   TAccountSigner extends string = string,
-  TAccountUser extends string = string,
+  TAccountAuthorizedClaimer extends string = string,
   TAccountGift extends string = string,
   TAccountGiftNftAta extends string = string,
   TAccountNftMint extends string = string,
-  TAccountSender extends string = string,
   TAccountTokenProgram extends string = string,
   TAccountAssociatedTokenProgram extends string = string,
 > = {
   signer: TransactionSigner<TAccountSigner>;
-  user: Address<TAccountUser>;
+  authorizedClaimer: TransactionSigner<TAccountAuthorizedClaimer>;
   gift: Address<TAccountGift>;
   giftNftAta: Address<TAccountGiftNftAta>;
   nftMint: Address<TAccountNftMint>;
-  sender: Address<TAccountSender>;
   tokenProgram?: Address<TAccountTokenProgram>;
   associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
 };
 
 export function getCancelGiftInstruction<
   TAccountSigner extends string,
-  TAccountUser extends string,
+  TAccountAuthorizedClaimer extends string,
   TAccountGift extends string,
   TAccountGiftNftAta extends string,
   TAccountNftMint extends string,
-  TAccountSender extends string,
   TAccountTokenProgram extends string,
   TAccountAssociatedTokenProgram extends string,
   TProgramAddress extends Address = typeof SOLGIFT_PROGRAM_ADDRESS,
 >(
   input: CancelGiftInput<
     TAccountSigner,
-    TAccountUser,
+    TAccountAuthorizedClaimer,
     TAccountGift,
     TAccountGiftNftAta,
     TAccountNftMint,
-    TAccountSender,
     TAccountTokenProgram,
     TAccountAssociatedTokenProgram
   >,
@@ -305,11 +284,10 @@ export function getCancelGiftInstruction<
 ): CancelGiftInstruction<
   TProgramAddress,
   TAccountSigner,
-  TAccountUser,
+  TAccountAuthorizedClaimer,
   TAccountGift,
   TAccountGiftNftAta,
   TAccountNftMint,
-  TAccountSender,
   TAccountTokenProgram,
   TAccountAssociatedTokenProgram
 > {
@@ -319,11 +297,13 @@ export function getCancelGiftInstruction<
   // Original accounts.
   const originalAccounts = {
     signer: { value: input.signer ?? null, isWritable: true },
-    user: { value: input.user ?? null, isWritable: true },
+    authorizedClaimer: {
+      value: input.authorizedClaimer ?? null,
+      isWritable: true,
+    },
     gift: { value: input.gift ?? null, isWritable: true },
     giftNftAta: { value: input.giftNftAta ?? null, isWritable: true },
-    nftMint: { value: input.nftMint ?? null, isWritable: false },
-    sender: { value: input.sender ?? null, isWritable: false },
+    nftMint: { value: input.nftMint ?? null, isWritable: true },
     tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
     associatedTokenProgram: {
       value: input.associatedTokenProgram ?? null,
@@ -349,11 +329,10 @@ export function getCancelGiftInstruction<
   return Object.freeze({
     accounts: [
       getAccountMeta(accounts.signer),
-      getAccountMeta(accounts.user),
+      getAccountMeta(accounts.authorizedClaimer),
       getAccountMeta(accounts.gift),
       getAccountMeta(accounts.giftNftAta),
       getAccountMeta(accounts.nftMint),
-      getAccountMeta(accounts.sender),
       getAccountMeta(accounts.tokenProgram),
       getAccountMeta(accounts.associatedTokenProgram),
     ],
@@ -362,11 +341,10 @@ export function getCancelGiftInstruction<
   } as CancelGiftInstruction<
     TProgramAddress,
     TAccountSigner,
-    TAccountUser,
+    TAccountAuthorizedClaimer,
     TAccountGift,
     TAccountGiftNftAta,
     TAccountNftMint,
-    TAccountSender,
     TAccountTokenProgram,
     TAccountAssociatedTokenProgram
   >);
@@ -379,13 +357,12 @@ export type ParsedCancelGiftInstruction<
   programAddress: Address<TProgram>;
   accounts: {
     signer: TAccountMetas[0];
-    user: TAccountMetas[1];
+    authorizedClaimer: TAccountMetas[1];
     gift: TAccountMetas[2];
     giftNftAta: TAccountMetas[3];
     nftMint: TAccountMetas[4];
-    sender: TAccountMetas[5];
-    tokenProgram: TAccountMetas[6];
-    associatedTokenProgram: TAccountMetas[7];
+    tokenProgram: TAccountMetas[5];
+    associatedTokenProgram: TAccountMetas[6];
   };
   data: CancelGiftInstructionData;
 };
@@ -398,7 +375,7 @@ export function parseCancelGiftInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCancelGiftInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 8) {
+  if (instruction.accounts.length < 7) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -412,11 +389,10 @@ export function parseCancelGiftInstruction<
     programAddress: instruction.programAddress,
     accounts: {
       signer: getNextAccount(),
-      user: getNextAccount(),
+      authorizedClaimer: getNextAccount(),
       gift: getNextAccount(),
       giftNftAta: getNextAccount(),
       nftMint: getNextAccount(),
-      sender: getNextAccount(),
       tokenProgram: getNextAccount(),
       associatedTokenProgram: getNextAccount(),
     },

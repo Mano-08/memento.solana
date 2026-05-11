@@ -1,5 +1,5 @@
 {
-  "address": "8UbHcmNUq5zRnYbdcjSPxqDdFAi6X58UsXgizstHZUbk",
+  "address": "Eb7kAScrjEpmxRmvSScSisev4VRWam7GserKaUTa12zq",
   "metadata": {
     "name": "solgift",
     "version": "0.1.0",
@@ -8,20 +8,112 @@
   },
   "instructions": [
     {
-      "name": "claim_gift",
-      "discriminator": [
-        100,
-        71,
-        251,
-        14,
-        225,
-        15,
-        243,
-        196
+      "name": "cancel_gift",
+      "discriminator": [1, 35, 202, 245, 89, 105, 95, 135],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [117, 115, 101, 114]
+              },
+              {
+                "kind": "account",
+                "path": "signer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "gift",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [103, 105, 102, 116]
+              },
+              {
+                "kind": "account",
+                "path": "signer"
+              },
+              {
+                "kind": "account",
+                "path": "gift.index",
+                "account": "Gift"
+              }
+            ]
+          }
+        },
+        {
+          "name": "gift_nft_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "gift"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206,
+                  235, 121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140,
+                  245, 133, 126, 255, 0, 169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "nft_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142,
+                13, 131, 11, 90, 19, 153, 218, 255, 16, 132, 4, 142, 123, 216,
+                219, 233, 248, 89
+              ]
+            }
+          }
+        },
+        {
+          "name": "nft_mint",
+          "relations": ["gift"]
+        },
+        {
+          "name": "sender",
+          "relations": ["gift"]
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        }
       ],
+      "args": []
+    },
+    {
+      "name": "claim_gift",
+      "discriminator": [100, 71, 251, 14, 225, 15, 243, 196],
       "accounts": [
         {
           "name": "authorized_claimer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "asset_recipient",
           "writable": true,
           "signer": true
         },
@@ -32,12 +124,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  103,
-                  105,
-                  102,
-                  116
-                ]
+                "value": [103, 105, 102, 116]
               },
               {
                 "kind": "account",
@@ -54,9 +141,7 @@
         },
         {
           "name": "nft_mint",
-          "relations": [
-            "gift"
-          ]
+          "relations": ["gift"]
         },
         {
           "name": "gift_nft_ata",
@@ -70,38 +155,9 @@
               {
                 "kind": "const",
                 "value": [
-                  6,
-                  221,
-                  246,
-                  225,
-                  215,
-                  101,
-                  161,
-                  147,
-                  217,
-                  203,
-                  225,
-                  70,
-                  206,
-                  235,
-                  121,
-                  172,
-                  28,
-                  180,
-                  133,
-                  237,
-                  95,
-                  91,
-                  55,
-                  145,
-                  58,
-                  140,
-                  245,
-                  133,
-                  126,
-                  255,
-                  0,
-                  169
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206,
+                  235, 121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140,
+                  245, 133, 126, 255, 0, 169
                 ]
               },
               {
@@ -112,86 +168,28 @@
             "program": {
               "kind": "const",
               "value": [
-                140,
-                151,
-                37,
-                143,
-                78,
-                36,
-                137,
-                241,
-                187,
-                61,
-                16,
-                41,
-                20,
-                142,
-                13,
-                131,
-                11,
-                90,
-                19,
-                153,
-                218,
-                255,
-                16,
-                132,
-                4,
-                142,
-                123,
-                216,
-                219,
-                233,
-                248,
-                89
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142,
+                13, 131, 11, 90, 19, 153, 218, 255, 16, 132, 4, 142, 123, 216,
+                219, 233, 248, 89
               ]
             }
           }
         },
         {
-          "name": "authorized_claimer_nft_ata",
+          "name": "asset_recipient_nft_ata",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "account",
-                "path": "authorized_claimer"
+                "path": "asset_recipient"
               },
               {
                 "kind": "const",
                 "value": [
-                  6,
-                  221,
-                  246,
-                  225,
-                  215,
-                  101,
-                  161,
-                  147,
-                  217,
-                  203,
-                  225,
-                  70,
-                  206,
-                  235,
-                  121,
-                  172,
-                  28,
-                  180,
-                  133,
-                  237,
-                  95,
-                  91,
-                  55,
-                  145,
-                  58,
-                  140,
-                  245,
-                  133,
-                  126,
-                  255,
-                  0,
-                  169
+                  6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206,
+                  235, 121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140,
+                  245, 133, 126, 255, 0, 169
                 ]
               },
               {
@@ -202,38 +200,9 @@
             "program": {
               "kind": "const",
               "value": [
-                140,
-                151,
-                37,
-                143,
-                78,
-                36,
-                137,
-                241,
-                187,
-                61,
-                16,
-                41,
-                20,
-                142,
-                13,
-                131,
-                11,
-                90,
-                19,
-                153,
-                218,
-                255,
-                16,
-                132,
-                4,
-                142,
-                123,
-                216,
-                219,
-                233,
-                248,
-                89
+                140, 151, 37, 143, 78, 36, 137, 241, 187, 61, 16, 41, 20, 142,
+                13, 131, 11, 90, 19, 153, 218, 255, 16, 132, 4, 142, 123, 216,
+                219, 233, 248, 89
               ]
             }
           }
@@ -254,26 +223,14 @@
         {
           "name": "answer_hash",
           "type": {
-            "array": [
-              "u8",
-              32
-            ]
+            "array": ["u8", 32]
           }
         }
       ]
     },
     {
       "name": "create_gift",
-      "discriminator": [
-        72,
-        252,
-        112,
-        45,
-        15,
-        71,
-        104,
-        225
-      ],
+      "discriminator": [72, 252, 112, 45, 15, 71, 104, 225],
       "accounts": [
         {
           "name": "signer",
@@ -287,12 +244,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  117,
-                  115,
-                  101,
-                  114
-                ]
+                "value": [117, 115, 101, 114]
               },
               {
                 "kind": "account",
@@ -308,12 +260,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  103,
-                  105,
-                  102,
-                  116
-                ]
+                "value": [103, 105, 102, 116]
               },
               {
                 "kind": "account",
@@ -346,19 +293,13 @@
         {
           "name": "salt",
           "type": {
-            "array": [
-              "u8",
-              32
-            ]
+            "array": ["u8", 32]
           }
         },
         {
           "name": "answer_hash",
           "type": {
-            "array": [
-              "u8",
-              32
-            ]
+            "array": ["u8", 32]
           }
         },
         {
@@ -367,162 +308,60 @@
         },
         {
           "name": "delivery_date",
-          "type": "u64"
+          "type": "i64"
         },
         {
           "name": "authorized_claimer",
           "type": "pubkey"
         }
       ]
-    },
-    {
-      "name": "initialize_user",
-      "discriminator": [
-        111,
-        17,
-        185,
-        250,
-        60,
-        122,
-        38,
-        254
-      ],
-      "accounts": [
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "user",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  115,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "signer"
-              }
-            ]
-          }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
     }
   ],
   "accounts": [
     {
       "name": "Gift",
-      "discriminator": [
-        228,
-        29,
-        11,
-        4,
-        86,
-        244,
-        244,
-        33
-      ]
+      "discriminator": [228, 29, 11, 4, 86, 244, 244, 33]
     },
     {
       "name": "User",
-      "discriminator": [
-        159,
-        117,
-        95,
-        227,
-        239,
-        151,
-        58,
-        236
-      ]
+      "discriminator": [159, 117, 95, 227, 239, 151, 58, 236]
     }
   ],
   "events": [
     {
       "name": "GiftClaimed",
-      "discriminator": [
-        70,
-        176,
-        25,
-        29,
-        237,
-        141,
-        185,
-        163
-      ]
+      "discriminator": [70, 176, 25, 29, 237, 141, 185, 163]
     },
     {
       "name": "GiftCreated",
-      "discriminator": [
-        149,
-        59,
-        123,
-        115,
-        215,
-        127,
-        14,
-        194
-      ]
+      "discriminator": [149, 59, 123, 115, 215, 127, 14, 194]
     }
   ],
   "errors": [
     {
       "code": 6000,
-      "name": "InvalidReceiver",
-      "msg": "Receiver public key is invalid"
+      "name": "InvalidAnswer",
+      "msg": "Answer entered is incorrect"
     },
     {
       "code": 6001,
-      "name": "BelowMinimumAmount",
-      "msg": "Minimum 0.001 SOL required as gift amount"
+      "name": "UnauthorizedClaimer",
+      "msg": "Claimer is not the same as approved recipient"
     },
     {
       "code": 6002,
-      "name": "CannotGiftToSelf",
-      "msg": "Cannot gift to self"
+      "name": "ClaimedAlready",
+      "msg": "Gift already claimed"
     },
     {
       "code": 6003,
-      "name": "CannotGiftToPast",
-      "msg": "Cannot gift to past"
+      "name": "IncorrectNFTMint",
+      "msg": "NFT mint address did not match the NFT mint in gift escrow"
     },
     {
       "code": 6004,
-      "name": "DeliveryDateMustBeInFuture",
-      "msg": "Delivery date must be in future"
-    },
-    {
-      "code": 6005,
-      "name": "InvalidAnswerHash",
-      "msg": "Invalid answer hash"
-    },
-    {
-      "code": 6006,
-      "name": "InvalidSalt",
-      "msg": "Invalid salt"
-    },
-    {
-      "code": 6007,
-      "name": "NotAnNFT",
-      "msg": "Not an NFT"
-    },
-    {
-      "code": 6008,
-      "name": "MintAuthorityNotRevoked",
-      "msg": "NFT mint authority not revoked"
+      "name": "GiftATAEmpty",
+      "msg": "Gift ATA doesn't have the NFT"
     }
   ],
   "types": [
@@ -533,19 +372,16 @@
         "fields": [
           {
             "name": "delivery_date",
-            "type": "u64"
+            "type": "i64"
           },
           {
             "name": "created_on",
-            "type": "u64"
+            "type": "i64"
           },
           {
             "name": "salt",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
@@ -557,16 +393,19 @@
             "type": "pubkey"
           },
           {
+            "name": "asset_recipient",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
             "name": "index",
             "type": "u16"
           },
           {
             "name": "answer_hash",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
@@ -580,6 +419,12 @@
           {
             "name": "sol_amount",
             "type": "u64"
+          },
+          {
+            "name": "claimed_on",
+            "type": {
+              "option": "i64"
+            }
           },
           {
             "name": "bump",
@@ -600,6 +445,10 @@
           {
             "name": "claimer",
             "type": "pubkey"
+          },
+          {
+            "name": "claimed_on",
+            "type": "i64"
           }
         ]
       }
@@ -623,7 +472,11 @@
           },
           {
             "name": "created_on",
-            "type": "u64"
+            "type": "i64"
+          },
+          {
+            "name": "idx",
+            "type": "u16"
           }
         ]
       }
@@ -636,10 +489,6 @@
           {
             "name": "count",
             "type": "u16"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
           }
         ]
       }

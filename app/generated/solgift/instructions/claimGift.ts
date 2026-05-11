@@ -99,19 +99,13 @@ export type ClaimGiftInstruction<
     ]
   >;
 
-export type ClaimGiftInstructionData = {
-  discriminator: ReadonlyUint8Array;
-  answerHash: ReadonlyUint8Array;
-};
+export type ClaimGiftInstructionData = { discriminator: ReadonlyUint8Array };
 
-export type ClaimGiftInstructionDataArgs = { answerHash: ReadonlyUint8Array };
+export type ClaimGiftInstructionDataArgs = {};
 
 export function getClaimGiftInstructionDataEncoder(): FixedSizeEncoder<ClaimGiftInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([
-      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
-      ["answerHash", fixEncoderSize(getBytesEncoder(), 32)],
-    ]),
+    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
     (value) => ({ ...value, discriminator: CLAIM_GIFT_DISCRIMINATOR }),
   );
 }
@@ -119,7 +113,6 @@ export function getClaimGiftInstructionDataEncoder(): FixedSizeEncoder<ClaimGift
 export function getClaimGiftInstructionDataDecoder(): FixedSizeDecoder<ClaimGiftInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
-    ["answerHash", fixDecoderSize(getBytesDecoder(), 32)],
   ]);
 }
 
@@ -153,7 +146,6 @@ export type ClaimGiftAsyncInput<
   systemProgram?: Address<TAccountSystemProgram>;
   associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
   tokenProgram?: Address<TAccountTokenProgram>;
-  answerHash: ClaimGiftInstructionDataArgs["answerHash"];
 };
 
 export async function getClaimGiftInstructionAsync<
@@ -223,9 +215,6 @@ export async function getClaimGiftInstructionAsync<
     ResolvedAccount
   >;
 
-  // Original args.
-  const args = { ...input };
-
   // Resolve default values.
   if (!accounts.giftNftAta.value) {
     accounts.giftNftAta.value = await getProgramDerivedAddress({
@@ -289,9 +278,7 @@ export async function getClaimGiftInstructionAsync<
       getAccountMeta(accounts.associatedTokenProgram),
       getAccountMeta(accounts.tokenProgram),
     ],
-    data: getClaimGiftInstructionDataEncoder().encode(
-      args as ClaimGiftInstructionDataArgs,
-    ),
+    data: getClaimGiftInstructionDataEncoder().encode({}),
     programAddress,
   } as ClaimGiftInstruction<
     TProgramAddress,
@@ -327,7 +314,6 @@ export type ClaimGiftInput<
   systemProgram?: Address<TAccountSystemProgram>;
   associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
   tokenProgram?: Address<TAccountTokenProgram>;
-  answerHash: ClaimGiftInstructionDataArgs["answerHash"];
 };
 
 export function getClaimGiftInstruction<
@@ -395,9 +381,6 @@ export function getClaimGiftInstruction<
     ResolvedAccount
   >;
 
-  // Original args.
-  const args = { ...input };
-
   // Resolve default values.
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
@@ -425,9 +408,7 @@ export function getClaimGiftInstruction<
       getAccountMeta(accounts.associatedTokenProgram),
       getAccountMeta(accounts.tokenProgram),
     ],
-    data: getClaimGiftInstructionDataEncoder().encode(
-      args as ClaimGiftInstructionDataArgs,
-    ),
+    data: getClaimGiftInstructionDataEncoder().encode({}),
     programAddress,
   } as ClaimGiftInstruction<
     TProgramAddress,

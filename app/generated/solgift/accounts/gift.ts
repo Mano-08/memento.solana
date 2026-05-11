@@ -17,14 +17,10 @@ import {
   fixEncoderSize,
   getAddressDecoder,
   getAddressEncoder,
-  getBooleanDecoder,
-  getBooleanEncoder,
   getBytesDecoder,
   getBytesEncoder,
   getI64Decoder,
   getI64Encoder,
-  getOptionDecoder,
-  getOptionEncoder,
   getStructDecoder,
   getStructEncoder,
   getU16Decoder,
@@ -36,18 +32,22 @@ import {
   transformEncoder,
   type Account,
   type Address,
-  type Codec,
-  type Decoder,
   type EncodedAccount,
-  type Encoder,
   type FetchAccountConfig,
   type FetchAccountsConfig,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
   type MaybeAccount,
   type MaybeEncodedAccount,
-  type Option,
-  type OptionOrNullable,
   type ReadonlyUint8Array,
 } from "@solana/kit";
+import {
+  getGiftStatusDecoder,
+  getGiftStatusEncoder,
+  type GiftStatus,
+  type GiftStatusArgs,
+} from "../types";
 
 export const GIFT_DISCRIMINATOR = new Uint8Array([
   228, 29, 11, 4, 86, 244, 244, 33,
@@ -64,13 +64,12 @@ export type Gift = {
   salt: ReadonlyUint8Array;
   sender: Address;
   authorizedClaimer: Address;
-  assetRecipient: Option<Address>;
+  assetRecipient: Address;
   index: number;
-  answerHash: ReadonlyUint8Array;
   nftMint: Address;
-  claimed: boolean;
+  status: GiftStatus;
   solAmount: bigint;
-  claimedOn: Option<bigint>;
+  claimedOn: bigint;
   bump: number;
 };
 
@@ -80,18 +79,17 @@ export type GiftArgs = {
   salt: ReadonlyUint8Array;
   sender: Address;
   authorizedClaimer: Address;
-  assetRecipient: OptionOrNullable<Address>;
+  assetRecipient: Address;
   index: number;
-  answerHash: ReadonlyUint8Array;
   nftMint: Address;
-  claimed: boolean;
+  status: GiftStatusArgs;
   solAmount: number | bigint;
-  claimedOn: OptionOrNullable<number | bigint>;
+  claimedOn: number | bigint;
   bump: number;
 };
 
 /** Gets the encoder for {@link GiftArgs} account data. */
-export function getGiftEncoder(): Encoder<GiftArgs> {
+export function getGiftEncoder(): FixedSizeEncoder<GiftArgs> {
   return transformEncoder(
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
@@ -100,13 +98,12 @@ export function getGiftEncoder(): Encoder<GiftArgs> {
       ["salt", fixEncoderSize(getBytesEncoder(), 32)],
       ["sender", getAddressEncoder()],
       ["authorizedClaimer", getAddressEncoder()],
-      ["assetRecipient", getOptionEncoder(getAddressEncoder())],
+      ["assetRecipient", getAddressEncoder()],
       ["index", getU16Encoder()],
-      ["answerHash", fixEncoderSize(getBytesEncoder(), 32)],
       ["nftMint", getAddressEncoder()],
-      ["claimed", getBooleanEncoder()],
+      ["status", getGiftStatusEncoder()],
       ["solAmount", getU64Encoder()],
-      ["claimedOn", getOptionEncoder(getI64Encoder())],
+      ["claimedOn", getI64Encoder()],
       ["bump", getU8Encoder()],
     ]),
     (value) => ({ ...value, discriminator: GIFT_DISCRIMINATOR }),
@@ -114,7 +111,7 @@ export function getGiftEncoder(): Encoder<GiftArgs> {
 }
 
 /** Gets the decoder for {@link Gift} account data. */
-export function getGiftDecoder(): Decoder<Gift> {
+export function getGiftDecoder(): FixedSizeDecoder<Gift> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["deliveryDate", getI64Decoder()],
@@ -122,19 +119,18 @@ export function getGiftDecoder(): Decoder<Gift> {
     ["salt", fixDecoderSize(getBytesDecoder(), 32)],
     ["sender", getAddressDecoder()],
     ["authorizedClaimer", getAddressDecoder()],
-    ["assetRecipient", getOptionDecoder(getAddressDecoder())],
+    ["assetRecipient", getAddressDecoder()],
     ["index", getU16Decoder()],
-    ["answerHash", fixDecoderSize(getBytesDecoder(), 32)],
     ["nftMint", getAddressDecoder()],
-    ["claimed", getBooleanDecoder()],
+    ["status", getGiftStatusDecoder()],
     ["solAmount", getU64Decoder()],
-    ["claimedOn", getOptionDecoder(getI64Decoder())],
+    ["claimedOn", getI64Decoder()],
     ["bump", getU8Decoder()],
   ]);
 }
 
 /** Gets the codec for {@link Gift} account data. */
-export function getGiftCodec(): Codec<GiftArgs, Gift> {
+export function getGiftCodec(): FixedSizeCodec<GiftArgs, Gift> {
   return combineCodec(getGiftEncoder(), getGiftDecoder());
 }
 
@@ -189,4 +185,8 @@ export async function fetchAllMaybeGift(
 ): Promise<MaybeAccount<Gift>[]> {
   const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
   return maybeAccounts.map((maybeAccount) => decodeGift(maybeAccount));
+}
+
+export function getGiftSize(): number {
+  return 204;
 }

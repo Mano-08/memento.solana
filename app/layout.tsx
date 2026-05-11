@@ -12,7 +12,7 @@ import { Toaster } from "@/components/ui/sonner";
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "SolGift",
+  title: "Memento",
   description: "Gift Time Locked Solana NFT!",
   icons: {
     icon: "/icon.svg",
@@ -27,8 +27,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
-      <body className={`${inter.className} antialiased relative`}>
+    <html
+      lang="en"
+      className={`${cn("font-sans", geist.variable)} overflow-x-hidden max-w-screen`}
+    >
+      <body className={`${inter.className} antialiased relative w-screen`}>
         <Providers>
           <AppNav />
           {children}

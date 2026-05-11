@@ -80,25 +80,6 @@ export function Providers({ children }: { children: ReactNode }) {
       | undefined;
     let container: HTMLDivElement | undefined;
 
-    // // Dynamic import to avoid bundling in production
-    // import("@solana/devtools").then(({ ConnectorDevtools }) => {
-    //   // Create container for devtools
-    //   container = document.createElement("div");
-    //   container.id = "connector-devtools-container";
-    //   document.body.appendChild(container);
-
-    //   // Create and mount devtools (auto-detects window.__connectorClient)
-    //   devtools = new ConnectorDevtools({
-    //     config: {
-    //       position: "bottom-right",
-    //       theme: "dark",
-    //       defaultOpen: false,
-    //       rpcUrl: process.env.NEXT_PUBLIC_RPC_URL,
-    //     },
-    //   });
-    //   devtools.mount(container);
-    // });
-
     // Cleanup on unmount
     return () => {
       devtools?.unmount();
@@ -126,17 +107,10 @@ export function Providers({ children }: { children: ReactNode }) {
             walletList: ["phantom", "backpack", "detected_solana_wallets"],
             walletChainType: "solana-only",
           },
-          // externalWallets: {
-          //   solana: {
-          //     // if not specified, solana wallets will show but connector won't work and defaults to opening the wallet installation page
-          //     connectors: toSolanaWalletConnectors({ shouldAutoConnect: true }),
-          //   },
-          // },
 
           solana: {
             rpcs: {
               "solana:mainnet": {
-                // rpc: createSolanaRpc("https://api.mainnet-beta.solana.com"),
                 rpc: createSolanaRpc(
                   "https://mainnet.helius-rpc.com/?api-key=568f70c7-8c96-4cd2-b1b0-904855733cea"
                 ),

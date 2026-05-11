@@ -121,9 +121,14 @@ solana-test-validator --bpf-program metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s 
 
 DEADLINES:
 
-[] build create-gift UI for Demo
-[] build claim-gift UI for Demo
-[] change DB schema
+[DONE] create user if not exist once login into supabase
+[DONE] store user information
+[] update frontend for demo
+
+- [] /
+- [] /create
+- [] /claim
+- [DONE] /dashboard
 
 per user we have gift count: so all the gifts upto that index is claimed or not_claimed or cancelled.
 db stores gift_id and encrypted question
@@ -133,32 +138,24 @@ gift_claimed_DB -> [claimer_wallet] [gift_pda]
 TODO;
 
 [DONE] create gift should not throw simuation failed error -> work on chain
-
 [DONE] claim gift -> no rent or orphan account should be present
-
 [DONE] 6. preview gift
-
 [DONE] 1. send claimed recipeitne + gift pda to DB
-
 [DONE] 5.a. dont close gift pda, instead add gift claimed_on details
-
 [DONE] 8. Accept gift on same day as valid ; ex created at 530 pm, then delivery date is also 530+1 pm given its the same day
-
 [DONE] 9. fix Wallet connector UI issue
-
 [DONE] 4. ceaate delivery date + creted on date in DB
-
 [DONE] 5. received gift should populate with info
-
 [DONE] 10. build dashboard
+[DONE] 3.⁠ ⁠Cron job
+[DONE] 4.⁠ ⁠Claim gift (1st thing is connecr wallet)
+[DONE] 6.⁠ ⁠Dashboard
+[DONE] 1.⁠ ⁠Connect wallet at /create
+[DONE] 2.⁠ ⁠Popup while gift creation
 
-[I] 3.⁠ ⁠Cron job
-[I] 4.⁠ ⁠Claim gift (1st thing is connecr wallet)
-[I] 5.⁠ ⁠With privy wallet have no popup for signing transaction
-[I] 6.⁠ ⁠Dashboard
-
-/create page
-[I] 1.⁠ ⁠Connect wallet at /create
-[I] 2.⁠ ⁠Popup while gift creation
-[I] 3. shiny image effect (redesign wrap page)
-[I] 4. toaster/popups
+/ - landing page (add shiny effect [P4_DONE])
+/create - toast errors [P4_DONE] + run simulation before pushing the image to Pinata [P1_DONE]
+/claim - OTP for end user [P1_DONE] + loading stage while gift information is fetched [P3] + display a blurred photo + delivery date when the gift can be claimed [P1]
+/dashboard - update profile picture + name [P4]
+appnav - sign into supabase mandatory [P1_DONE]
+cancel_gift.rs - complete the code so people can cancel gift [P1]

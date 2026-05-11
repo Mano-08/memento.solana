@@ -31,8 +31,3 @@ export const inter = Inter({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 });
-
-// export const atkinsonHyperlegibleNext = Atkinson_Hyperlegible_Next({
-//   subsets: ["latin"],
-//   weight: ["400", "500", "600", "700"],
-// });

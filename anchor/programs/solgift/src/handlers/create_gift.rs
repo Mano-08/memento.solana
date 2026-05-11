@@ -1,14 +1,15 @@
 use anchor_lang::prelude::*;
 use crate::constants::SEED_GIFT_ACCOUNT;
 use crate::constants::SEED_USER_ACCOUNT;
+use crate::error::ClaimError;
 use crate::error::GiftError;
 use crate::state::Gift;
+use crate::state::GiftStatus;
 use crate::state::User;
 use anchor_lang::system_program;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::{
-    token_interface::{Mint, TokenInterface},
-};
+use mpl_token_metadata::accounts::MasterEdition;
+use anchor_spl::{token_interface::{Mint, TokenInterface,TokenAccount}};
 
 #[event]
 pub struct GiftCreated {
@@ -23,6 +24,8 @@ pub struct GiftCreated {
 pub struct CreateGift<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
+    #[account(mut)]
+    pub authorized_claimer: Signer<'info>,
     #[account(
         init_if_needed,
         payer = signer,
@@ -44,19 +47,26 @@ pub struct CreateGift<'info> {
     )]
     pub gift: Account<'info, Gift>,
     #[account(
-        constraint = nft_mint.supply == 1               @ GiftError::NotAnNFT,
-        constraint = nft_mint.mint_authority.is_none()  @ GiftError::MintAuthorityNotRevoked,
-        constraint = nft_mint.decimals == 0             @ GiftError::NotAnNFT,
+        constraint = nft_mint.supply == 1       @ GiftError::NotAnNFT,
+        constraint = nft_mint.decimals == 0     @ GiftError::NotAnNFT,
     )]
     pub nft_mint: InterfaceAccount<'info, Mint>,
+    #[account(
+        mut,
+        associated_token::mint = nft_mint,
+        associated_token::authority = gift,
+        constraint = gift_nft_ata.amount == 1 @ ClaimError::GiftATAEmpty,
+    )]
+    pub gift_nft_ata: InterfaceAccount<'info, TokenAccount>,
 
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Interface<'info, TokenInterface>,
 }
 
-pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 32], sol_amount: u64, delivery_date: i64, authorized_claimer: Pubkey) -> Result<()> {
+pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], sol_amount: u64, delivery_date: i64) -> Result<()> {
     require!(sol_amount >= 1_000_000, GiftError::BelowMinimumAmount);
+    let authorized_claimer: Pubkey = ctx.accounts.authorized_claimer.key();
     require!(
         authorized_claimer != Pubkey::default(),
         GiftError::InvalidReceiver
@@ -66,21 +76,28 @@ pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 3
         GiftError::CannotGiftToSelf 
     );
     require!(
-        answer_hash != [0u8; 32],
-        GiftError::InvalidAnswerHash
-    );
-    require!(
         salt != [0u8; 32],
         GiftError::InvalidSalt
     );
+    let gift_nft_ata = &ctx.accounts.gift_nft_ata;
+    let mint = &ctx.accounts.nft_mint;
     require!(
-        ctx.accounts.nft_mint.mint_authority.is_none(),
+        gift_nft_ata.mint == mint.key(),
+        GiftError::GiftPDADoesNotHaveNFT
+    );
+    require!(
+        gift_nft_ata.amount == 1,
+        GiftError::GiftPDADoesNotHaveNFT
+    );
+    
+    let (master_edition_pda, _) = MasterEdition::find_pda(&mint.key());
+    let mint_authority = mint.mint_authority;
+    require!(
+        mint_authority == Option::None.into() 
+            || mint_authority == Option::Some(master_edition_pda).into(),
         GiftError::MintAuthorityNotRevoked
     );
-    require!(
-        ctx.accounts.nft_mint.supply == 1,
-        GiftError::NotAnNFT
-    );
+    
     let gift = &mut ctx.accounts.gift;
     let user = &mut ctx.accounts.user;
     gift.created_on = Clock::get()?.unix_timestamp as i64;
@@ -89,19 +106,17 @@ pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], answer_hash: [u8; 3
         delivery_date >= (gift.created_on - TIMEZONE_BUFFER),
         GiftError::CannotGiftToPast
     );
-    gift.answer_hash = answer_hash;
+    gift.nft_mint = mint.key();
     gift.salt = salt;
-    gift.nft_mint = ctx.accounts.nft_mint.key();
     gift.delivery_date = delivery_date;
     gift.sol_amount = sol_amount;
     gift.sender = ctx.accounts.signer.key();
     gift.authorized_claimer = authorized_claimer;
     gift.index = user.count;
     gift.bump = ctx.bumps.gift;
-    gift.claimed = false;
+    gift.status = GiftStatus::NotClaimed;
     user.count += 1;
 
-    // Transfer SOL from sender's wallet to gift's wallet
     let cpi_context = CpiContext::new(
         ctx.accounts.system_program.to_account_info(),
         system_program::Transfer {
