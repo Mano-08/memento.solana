@@ -4,6 +4,7 @@ use crate::constants::SEED_USER_ACCOUNT;
 use crate::error::ClaimError;
 use crate::error::GiftError;
 use crate::state::Gift;
+use crate::state::GiftStatus;
 use crate::state::User;
 use anchor_lang::system_program;
 use anchor_spl::associated_token::AssociatedToken;
@@ -113,7 +114,7 @@ pub fn create_gift(ctx: Context<CreateGift>, salt: [u8; 32], sol_amount: u64, de
     gift.authorized_claimer = authorized_claimer;
     gift.index = user.count;
     gift.bump = ctx.bumps.gift;
-    gift.claimed = false;
+    gift.status = GiftStatus::NotClaimed;
     user.count += 1;
 
     let cpi_context = CpiContext::new(

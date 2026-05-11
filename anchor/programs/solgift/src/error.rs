@@ -11,11 +11,15 @@ pub enum ClaimError {
     #[msg("NFT mint address did not match the NFT mint in gift escrow")]
     IncorrectNFTMint,
     #[msg("Gift ATA doesn't have the NFT")]
-    GiftATAEmpty
+    GiftATAEmpty,
+    #[msg("Unauthorized Access")]
+    Unauthorized
 }
 
 #[error_code]
 pub enum GiftError {
+    #[msg("InvalidPaymentToken")]
+    InvalidPaymentToken,
     #[msg("Receiver public key is invalid")]
     InvalidReceiver,
     #[msg("Minimum 0.001 SOL required as gift amount")]

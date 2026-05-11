@@ -12,7 +12,7 @@ import dino6 from "@/public/dino/dino1-6.png";
 import dino7 from "@/public/dino/dino1-7.png";
 import dino8 from "@/public/dino/dino1-8.png";
 import dino9 from "@/public/dino/dino1-9.png";
-import Gifts from "../components/tabs";
+import Gifts from "../components/gifts";
 import { createUserAccountIfNotExist } from "../lib/supabase/auth";
 import { useConnector } from "@solana/connector/react";
 import { usePrivy } from "@privy-io/react-auth";
@@ -66,8 +66,8 @@ export default function home() {
     <main
       className={`bg-custom-landing min-h-screen py-20 px-5 ${spaceMono.className} w-screen overflow-x-hidden`}
     >
-      <section className="sm:w-7xl mx-auto px-5 sm:px-10 py-10 bg-white my-10 rounded-[35px] flex flex-col gap-10 border-[6px] border-black shadow-[-5px_5px_0_0_rgba(0,0,0)]">
-        <div className="flex flex-col sm:flex-row items-center gap-10">
+      <section className="lg:w-7xl mx-auto px-5 lg:px-10 py-10 bg-white my-10 rounded-[35px] flex flex-col gap-10 border-[6px] border-black shadow-[-5px_5px_0_0_rgba(0,0,0)]">
+        <div className="flex flex-col lg:flex-row items-center gap-10">
           <img
             height={200}
             width={200}

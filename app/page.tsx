@@ -17,20 +17,20 @@ export default function Home() {
     <>
       <main className="min-h-screen flex flex-col items-center justify-center w-screen overflow-x-hidden">
         <section className="min-h-screen py-10 bg-custom-landing w-full flex items-center justify-center ">
-          <div className="flex-col-reverse sm:flex-row flex items-center justify-center max-w-5xl w-full gap-20">
-            <div className="flex flex-col justify-center items-center sm:items-start">
+          <div className="flex-col-reverse lg:flex-row flex items-center justify-center max-w-5xl w-full gap-20">
+            <div className="flex flex-col justify-center items-center lg:items-start">
               <h1
-                className={`text-4xl sm:text-7xl text-center sm:text-left w-full sm:w-auto ${bricolage.className}`}
+                className={`text-4xl lg:text-7xl text-center lg:text-left w-full lg:w-auto ${bricolage.className}`}
               >
                 <span className="block  text-neutral-500 ">
-                  Thoughtful <br className="sm:block hidden" /> gifts <br />
+                  Thoughtful <br className="lg:block hidden" /> gifts <br />
                   {/* <span className="text-colored">start here.</span> */}
                   <SparkleCluster />
                   <span className="text-neutral-400">start here.</span>
                 </span>
               </h1>
               <div
-                className={`text-sm sm:text-lg mt-2  text-neutral-500 max-w-2xl text-center sm:text-left font-medium`}
+                className={`text-sm lg:text-lg mt-2  text-neutral-500 max-w-2xl text-center lg:text-left font-medium`}
               >
                 Send an NFT, set the unlock date, and surprise someone special.
                 Make moments memorable on-chain.
@@ -43,12 +43,12 @@ export default function Home() {
                 >
                   <Link
                     href="/create"
-                    className=" hover:bg-amber-400/90 bg-amber-400 px-[100px] text-black py-2 text-xl sm:text-2xl items-center justify-center gap-2 whitespace-nowrap rounded-lg font-semibold transition-all"
+                    className=" hover:bg-amber-400/90 bg-amber-400 px-[100px] text-black py-2 text-xl lg:text-2xl items-center justify-center gap-2 whitespace-nowrap rounded-lg font-semibold transition-all"
                   >
                     Gift now!
                   </Link>
                 </Button>
-                <p className="inline-flex gap-2 group text-xs sm:text-sm  text-white/80">
+                <p className="inline-flex gap-2 group text-xs lg:text-sm  text-white/80">
                   <span>powered by</span>
                   <Image
                     src={solanaLogoMark}
@@ -67,12 +67,12 @@ export default function Home() {
             </div>
 
             <div className="flex flex-col items-center justify-center w-full">
-              <div className="relative flex flex-row items-center w-[220px] h-[220px] sm:my-0 my-[75px] sm:w-[400px] sm:h-[400px] group">
+              <div className="relative flex flex-row items-center w-[220px] h-[220px] lg:my-0 my-[75px] lg:w-[400px] lg:h-[400px] group">
                 {/* Aurora Image (top card) */}
                 <div className="absolute -top-7" style={{ perspective: 1200 }}>
                   <div
                     className="
-                      bg-white rounded-xl shadow-xl border w-[220px] sm:w-[400px] border-gray-300 p-2
+                      bg-white rounded-xl shadow-xl border w-[220px] lg:w-[400px] border-gray-300 p-2
                       transition-transform duration-500
                       hover:scale-110 rotate-8 group-hover:-rotate-8 max-w-[450px]
                       [box-shadow:0_8px_32px_rgba(0,0,0,0.16),0_2px_8px_rgba(0,0,0,0.08)]
@@ -84,7 +84,7 @@ export default function Home() {
                     <Image
                       src={auroraImage}
                       alt="trekking with my sister the summer of 2025"
-                      className="rounded-md block object-cover w-full h-[220px] sm:h-[400px]"
+                      className="rounded-md block object-cover w-full h-[220px] lg:h-[400px]"
                     />
                     <div className="mt-5 mb-2 px-1 text-center text-xs font-mono text-gray-600">
                       Winter 2009 • Lua and Aurora
@@ -95,7 +95,7 @@ export default function Home() {
                 <div className="absolute top-7" style={{ perspective: 1200 }}>
                   <div
                     className="
-                      bg-neutral-50 rounded-xl shadow-xl border w-[220px] sm:w-[400px] border-gray-300 p-2
+                      bg-neutral-50 rounded-xl shadow-xl border w-[220px] lg:w-[400px] border-gray-300 p-2
                       transition-transform duration-500
                       hover:scale-110 -rotate-6 group-hover:rotate-6 max-w-[450px]
                       [box-shadow:0_8px_32px_rgba(0,0,0,0.16),0_2px_8px_rgba(0,0,0,0.08)]
@@ -106,7 +106,7 @@ export default function Home() {
                     <Image
                       src={helpingHandImage}
                       alt="trekking with my sister the summer of 2025"
-                      className="rounded-md block object-cover w-full h-[220px] sm:h-[400px]"
+                      className="rounded-md block object-cover w-full h-[220px] lg:h-[400px]"
                     />
                     <div className="mt-5 mb-2 px-1 text-center text-xs font-mono text-gray-600">
                       Summer 2012 • Fun times in San Francisco
@@ -119,8 +119,8 @@ export default function Home() {
         </section>
 
         <section className=" w-full flex flex-col items-center py-20">
-          <div className="flex flex-row sm:gap-8 gap-2">
-            <div className="text-black/50 sm:text-left text-center">
+          <div className="flex flex-row lg:gap-8 gap-2">
+            <div className="text-black/50 lg:text-left text-center">
               <h3 className="text-4xl text-black font-extrabold">
                 Wrap <span className="text-black/50">the Gift</span>
               </h3>
@@ -132,13 +132,13 @@ export default function Home() {
             </div>
             <div className="flex flex-col items-center justify-center my-4">
               <div className="relative flex items-center h-[150px]">
-                <div className="sm:w-[150px] w-0.5 h-[150px] bg-black sm:h-0.5 "></div>
+                <div className="lg:w-[150px] w-0.5 h-[150px] bg-black lg:h-0.5 "></div>
                 <div className="absolute left-1/2 bg-purple-100 h-10 w-10 -translate-x-1/2 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center rounded-full border-4 border-purple-100 shadow">
                   <span className="text-2xl">🔒</span>
                 </div>
               </div>
             </div>
-            <div className="text-black/50 sm:text-right text-center">
+            <div className="text-black/50 lg:text-right text-center">
               <h3 className="text-4xl text-black font-extrabold">
                 <span className="text-black/50">Gift </span>Delivered
               </h3>

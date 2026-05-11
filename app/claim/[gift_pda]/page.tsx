@@ -6,6 +6,7 @@ import {
   fetchGift,
   getClaimGiftInstruction,
   Gift,
+  GiftStatus,
 } from "@/app/generated/solgift";
 import { UiWalletAccount, useWallets } from "@wallet-standard/react";
 import { ArrowRight, Check, DollarSign, Key, Mail, Puzzle } from "lucide-react";
@@ -81,6 +82,7 @@ import {
   sendAndConfirmTransactionFactory,
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
+  Signature,
   signTransactionMessageWithSigners,
   TransactionSigner,
 } from "@solana/kit";
@@ -89,6 +91,7 @@ import { useParams } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
 import { useConnector } from "@solana/connector/react";
 import {
+  claimRentAuthorizedClaimer,
   createAuthorizedRecipientSigner,
   createPrivySigner,
 } from "@/app/lib/utils";
@@ -113,19 +116,12 @@ import { toast } from "sonner";
 import { Spinner } from "@/app/components/ui/spinner";
 import { sendOtpToEmailAddress } from "@/app/lib/nodemailer/mail";
 import { SparkleCluster } from "@/app/components/stars";
+import { ClaimGiftErrors } from "@/app/lib/types";
 
 const rpc = createSolanaRpc("https://api.devnet.solana.com");
 const rpcSubscriptions = createSolanaRpcSubscriptions(
   "ws://api.devnet.solana.com"
 );
-
-enum ClaimGiftErrors {
-  INVALID_GIFT_ID,
-  GIFT_DOESNT_EXIST,
-  GIFT_ALREADY_CLAIMED,
-  GIFT_LOCKED,
-  FAILED_TO_CLAIM_GIFT,
-}
 
 type GiftClaimedResponse = {
   gift: Account<Gift, string>;
@@ -368,7 +364,6 @@ export default function Page() {
 
       async function sendAndConfirm(options: {
         instructions: Instruction[];
-
         payer: TransactionSigner<string>;
       }) {
         const { instructions, payer } = options;
@@ -484,24 +479,6 @@ export default function Page() {
           console.error("❌ Send failed:", err?.message);
           console.error("   Error code:", err?.context?.err);
 
-          setGiftClaimStages((prev) => {
-            const idx = prev.findIndex(
-              (s) => s.stage === GiftClaimStages.ClaimingGift
-            );
-            if (idx !== -1) {
-              // Update existing UploadingImage stage
-              const updated = [...prev];
-              updated[idx] = {
-                ...updated[idx],
-                errorMessage: "Couldnt Claim Gift, try again!",
-                status: GiftClaimingStatus.Error,
-              };
-              return updated;
-            }
-            // If not found, just return prev unchanged (or you may choose to push, but per instruction do not)
-            return prev;
-          });
-
           const logs: string[] = err?.context?.logs ?? [];
           if (logs.length) {
             console.error("📋 Transaction logs:");
@@ -525,6 +502,47 @@ export default function Page() {
         return sig;
       }
 
+      let sx: Signature | null = null;
+      try {
+        sx = await sendAndConfirm({
+          instructions,
+          payer: payer,
+        });
+
+        toast.success(
+          <span>
+            Gift cancelled successfully.{" "}
+            <a
+              href={`https://solscan.io/tx/${sx}?cluster=devnet`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "#6366f1", textDecoration: "underline" }}
+            >
+              View on Solscan
+            </a>
+          </span>
+        );
+      } catch (error) {
+        setGiftClaimStages((prev) => {
+          const idx = prev.findIndex(
+            (s) => s.stage === GiftClaimStages.ClaimingGift
+          );
+          if (idx !== -1) {
+            // Update existing UploadingImage stage
+            const updated = [...prev];
+            updated[idx] = {
+              ...updated[idx],
+              errorMessage: "Couldnt Claim Gift, try again!",
+              status: GiftClaimingStatus.Error,
+            };
+            return updated;
+          }
+          // If not found, just return prev unchanged (or you may choose to push, but per instruction do not)
+          return prev;
+        });
+        throw error;
+      }
+
       setGiftClaimStages((prev) => {
         return [
           ...prev,
@@ -535,11 +553,10 @@ export default function Page() {
           },
         ];
       });
-
-      const sx = await sendAndConfirm({
-        instructions,
-        payer: payer,
-      });
+      // const sx = await sendAndConfirm({
+      //   instructions,
+      //   payer: payer,
+      // });
 
       setGiftClaimStages((prev) => {
         const idx = prev.findIndex(
@@ -562,6 +579,7 @@ export default function Page() {
       await claimRentAuthorizedClaimer({
         nftMint,
         authorizedClaimerKeypair,
+        sender: gift.data.sender,
       });
 
       try {
@@ -606,7 +624,7 @@ export default function Page() {
             if (
               updatedGift &&
               updatedGift.data &&
-              updatedGift.data.claimed === true
+              updatedGift.data.status === GiftStatus.Claimed
             ) {
               break;
             }
@@ -627,7 +645,7 @@ export default function Page() {
             name: metadataBody.name ?? "",
             image: metadataBody.image ?? "",
           },
-          signature: sx,
+          signature: sx!,
         });
       } catch (error) {
         setClaimGiftError(ClaimGiftErrors.FAILED_TO_CLAIM_GIFT);
@@ -688,63 +706,9 @@ export default function Page() {
     setClaimGiftError(null);
   }
 
-  async function claimRentAuthorizedClaimer({
-    nftMint,
-    authorizedClaimerKeypair,
-  }: {
-    nftMint: Address<string>;
-    authorizedClaimerKeypair: KeyPairSigner;
-  }) {
-    try {
-      if (!gift) return;
-      const { value: sol_left } = await rpc
-        .getBalance(authorizedClaimerKeypair.address)
-        .send();
-
-      // Second tx: clean up SOL from authorized claimer
-      const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
-      const emptyAuthorizedClaimerIx = getTransferSolInstruction({
-        source: authorizedClaimerKeypair,
-        destination: gift.data.sender,
-        amount: sol_left - lamports(5000n),
-      });
-      const instructions_2: Instruction[] = [];
-      instructions_2.push(emptyAuthorizedClaimerIx);
-      const transactionMessage = pipe(
-        createTransactionMessage({ version: 0 }),
-        (tx) =>
-          setTransactionMessageFeePayerSigner(authorizedClaimerKeypair, tx),
-        (tx) =>
-          setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
-        (tx) => appendTransactionMessageInstructions(instructions_2, tx)
-      );
-
-      const signedTransaction =
-        await signTransactionMessageWithSigners(transactionMessage);
-      assertIsTransactionWithBlockhashLifetime(signedTransaction);
-
-      console.log("HJI");
-      await sendAndConfirmTransactionFactory({
-        rpc,
-        rpcSubscriptions,
-      })(signedTransaction, { commitment: "confirmed" });
-      console.log("HJI2");
-
-      const asset = await fetchDigitalAsset(rpc, nftMint);
-
-      console.log("NFT created successfully!");
-      console.log("Mint address:", nftMint);
-
-      console.log("Name:", asset.metadata.name);
-      console.log("URI:", asset.metadata.uri);
-    } catch (error) {
-      console.log(error);
-      throw error;
-    }
-  }
-
   const handleReceivedModalOpenChange = useCallback(
     (open: boolean) => {
+      return;
       if (!open) {
         // Only allow closing if any stage has status Error or all claim stages succeeded
         const canClose =
@@ -773,7 +737,7 @@ export default function Page() {
     >
       <Modal closeGiftErrorModal={closeGiftErrorModal} error={claimGiftError} />
 
-      {gift && (
+      {/* {gift && (
         <EmailOTPModal
           decrypted={decrypted}
           open={!emailVerified}
@@ -784,7 +748,17 @@ export default function Page() {
           setEmail={setEmail}
           setEmailVerified={setEmailVerified}
         />
-      )}
+      )} */}
+      <input
+        type="email"
+        placeholder="Enter your email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="rounded-lg w-full px-1.5 text-left text-sm py-2 leading-none text-neutral-800 bg-white border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-lime-200 transition"
+        name="email"
+        id="email"
+      />
+
       <LoadingClaimStagesModal
         giftClaimStages={giftClaimStages}
         giftClaimed={giftClaimed}
@@ -793,10 +767,10 @@ export default function Page() {
       />
       <form
         onSubmit={(e) => e.preventDefault()}
-        className="sm:max-w-xl mx-auto flex gap-6 sm:w-auto w-full flex-col items-center"
+        className="lg:max-w-xl mx-auto flex gap-6 lg:w-auto w-full flex-col items-center"
       >
         <div
-          className={`sm:min-w-[400px] w-full flex flex-col gap-4 animate-slideUp delay-200! ${
+          className={`lg:min-w-[400px] w-full flex flex-col gap-4 animate-slideUp delay-200! ${
             !decrypted ? "opacity-30 cursor-not-allowed rounded-lg" : ""
           }`}
           style={{ pointerEvents: "auto" }}
@@ -808,7 +782,7 @@ export default function Page() {
           }}
         >
           <fieldset
-            className={`flex w-full font-semibold text-sm flex-col gap-2 justify-between items-start rounded-[20px] transition-transform duration-400 groupfocus-within:scale-105 bg-white p-4 sm:focus-within:scale-110 sm:focus-within:rounded-2xl sm:focus-within:p-4`}
+            className={`flex w-full font-semibold text-sm flex-col gap-2 justify-between items-start rounded-[20px] transition-transform duration-400 groupfocus-within:scale-105 bg-white p-4 lg:focus-within:scale-110 lg:focus-within:rounded-2xl lg:focus-within:p-4`}
           >
             <label
               className="flex flex-row items-center gap-2 text-neutral-700 leading-none"
@@ -904,7 +878,7 @@ function Modal({
 
   return (
     <Dialog open={error !== null} onOpenChange={closeGiftErrorModal}>
-      <DialogContent className="sm:max-w-md rounded-[24px]">
+      <DialogContent className="lg:max-w-md rounded-[24px]">
         <div className="flex flex-col gap-5 items-center text-center">
           <DialogTitle className="text-lg font-semibold px-6 pt-8">
             {title}
@@ -1189,7 +1163,7 @@ function EmailOTPModal({
 
   return (
     <Dialog open={open}>
-      <DialogContent className="sm:max-w-md [&>button]:hidden rounded-[24px]">
+      <DialogContent className="lg:max-w-md [&>button]:hidden rounded-[24px]">
         <DialogHeader className="flex flex-row items-center justify-between px-7 pt-7">
           <DialogTitle className="text-base text-left">
             Verify Email
@@ -1348,7 +1322,7 @@ function LoadingClaimStagesModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {isGiftClaimed && <CustomConfetti />}
-      <DialogContent className="sm:max-w-md [&>button]:hidden rounded-[24px]">
+      <DialogContent className="lg:max-w-md [&>button]:hidden rounded-[24px]">
         <DialogHeader className="flex flex-row items-center justify-between px-7 pt-7">
           <DialogTitle className="text-base text-left">
             {isGiftClaimed ? "Gift claimed successfully" : "Claiming Gift"}

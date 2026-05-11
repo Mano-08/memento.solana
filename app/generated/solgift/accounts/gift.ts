@@ -17,8 +17,6 @@ import {
   fixEncoderSize,
   getAddressDecoder,
   getAddressEncoder,
-  getBooleanDecoder,
-  getBooleanEncoder,
   getBytesDecoder,
   getBytesEncoder,
   getI64Decoder,
@@ -44,6 +42,12 @@ import {
   type MaybeEncodedAccount,
   type ReadonlyUint8Array,
 } from "@solana/kit";
+import {
+  getGiftStatusDecoder,
+  getGiftStatusEncoder,
+  type GiftStatus,
+  type GiftStatusArgs,
+} from "../types";
 
 export const GIFT_DISCRIMINATOR = new Uint8Array([
   228, 29, 11, 4, 86, 244, 244, 33,
@@ -63,7 +67,7 @@ export type Gift = {
   assetRecipient: Address;
   index: number;
   nftMint: Address;
-  claimed: boolean;
+  status: GiftStatus;
   solAmount: bigint;
   claimedOn: bigint;
   bump: number;
@@ -78,7 +82,7 @@ export type GiftArgs = {
   assetRecipient: Address;
   index: number;
   nftMint: Address;
-  claimed: boolean;
+  status: GiftStatusArgs;
   solAmount: number | bigint;
   claimedOn: number | bigint;
   bump: number;
@@ -97,7 +101,7 @@ export function getGiftEncoder(): FixedSizeEncoder<GiftArgs> {
       ["assetRecipient", getAddressEncoder()],
       ["index", getU16Encoder()],
       ["nftMint", getAddressEncoder()],
-      ["claimed", getBooleanEncoder()],
+      ["status", getGiftStatusEncoder()],
       ["solAmount", getU64Encoder()],
       ["claimedOn", getI64Encoder()],
       ["bump", getU8Encoder()],
@@ -118,7 +122,7 @@ export function getGiftDecoder(): FixedSizeDecoder<Gift> {
     ["assetRecipient", getAddressDecoder()],
     ["index", getU16Decoder()],
     ["nftMint", getAddressDecoder()],
-    ["claimed", getBooleanDecoder()],
+    ["status", getGiftStatusDecoder()],
     ["solAmount", getU64Decoder()],
     ["claimedOn", getI64Decoder()],
     ["bump", getU8Decoder()],

@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import {
+  ClaimGiftErrors,
   CreateGiftData,
   CreateGiftStage,
   GiftCreationStage,
@@ -8,8 +9,11 @@ import {
 } from "./types";
 import { DateTime } from "luxon";
 import {
+  Account,
+  assertIsFullySignedTransaction,
   compileTransaction,
   createSolanaRpc,
+  createSolanaRpcSubscriptions,
   FixedSizeEncoder,
   generateKeyPair,
   generateKeyPairSigner,
@@ -59,109 +63,109 @@ type sendAndConfirmParams = {
   payer: TransactionSigner;
 };
 
-export async function sendAndConfirm(options: sendAndConfirmParams) {
-  const { instructions, payer, rpc, rpcSubscriptions } = options;
-  const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
-  console.log(payer.address);
-  const transactionMessage = pipe(
-    createTransactionMessage({ version: 0 }),
-    (tx) => setTransactionMessageFeePayer(payer.address, tx),
-    (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
-    (tx) => appendTransactionMessageInstructions([...instructions], tx)
-  );
+// export async function sendAndConfirm(options: sendAndConfirmParams) {
+//   const { instructions, payer, rpc, rpcSubscriptions } = options;
+//   const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+//   console.log(payer.address);
+//   const transactionMessage = pipe(
+//     createTransactionMessage({ version: 0 }),
+//     (tx) => setTransactionMessageFeePayer(payer.address, tx),
+//     (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+//     (tx) => appendTransactionMessageInstructions([...instructions], tx)
+//   );
 
-  console.log("Preparing to sign transaction.");
+//   console.log("Preparing to sign transaction.");
 
-  const signedTransaction =
-    await signTransactionMessageWithSigners(transactionMessage);
+//   const signedTransaction =
+//     await signTransactionMessageWithSigners(transactionMessage);
 
-  console.log("Signed Transaction:", signedTransaction);
+//   console.log("Signed Transaction:", signedTransaction);
 
-  assertIsSendableTransaction(signedTransaction);
-  assertIsTransactionWithBlockhashLifetime(signedTransaction);
+//   assertIsSendableTransaction(signedTransaction);
+//   assertIsTransactionWithBlockhashLifetime(signedTransaction);
 
-  // ── Simulate first to get full logs before attempting send ───────────────
-  try {
-    const { value: simulation } = await rpc
-      .simulateTransaction(
-        getBase64EncodedWireTransaction(signedTransaction), // encode signed tx → base64 wire format
-        {
-          encoding: "base64",
-          replaceRecentBlockhash: true, // use current blockhash for simulation
-          commitment: "confirmed",
-        }
-      )
-      .send();
+//   // ── Simulate first to get full logs before attempting send ───────────────
+//   try {
+//     const { value: simulation } = await rpc
+//       .simulateTransaction(
+//         getBase64EncodedWireTransaction(signedTransaction), // encode signed tx → base64 wire format
+//         {
+//           encoding: "base64",
+//           replaceRecentBlockhash: true, // use current blockhash for simulation
+//           commitment: "confirmed",
+//         }
+//       )
+//       .send();
 
-    if (simulation.err) {
-      console.error(
-        "[ERROR] Simulation error:",
-        JSON.stringify(
-          simulation.err,
-          (_, v) => (typeof v === "bigint" ? v.toString() : v),
-          2
-        )
-      );
-      console.error("📋 Logs:");
-      simulation.logs?.forEach((log: string, i: number) =>
-        console.log(`  [${i}] ${log}`)
-      );
-      throw new Error(
-        `Simulation failed: ${JSON.stringify(
-          simulation.err,
-          (_, v) => (typeof v === "bigint" ? v.toString() : v),
-          2
-        )}`
-      );
-    }
+//     if (simulation.err) {
+//       console.error(
+//         "[ERROR] Simulation error:",
+//         JSON.stringify(
+//           simulation.err,
+//           (_, v) => (typeof v === "bigint" ? v.toString() : v),
+//           2
+//         )
+//       );
+//       console.error("📋 Logs:");
+//       simulation.logs?.forEach((log: string, i: number) =>
+//         console.log(`  [${i}] ${log}`)
+//       );
+//       throw new Error(
+//         `Simulation failed: ${JSON.stringify(
+//           simulation.err,
+//           (_, v) => (typeof v === "bigint" ? v.toString() : v),
+//           2
+//         )}`
+//       );
+//     }
 
-    console.log("✅ Simulation passed, sending...");
-    console.log("📋 Simulation logs:");
-    simulation.logs?.forEach((log: string, i: number) =>
-      console.log(`  [${i}] ${log}`)
-    );
-  } catch (simErr: any) {
-    // SolanaError wraps simulation errors — extract the logs
-    const logs = simErr?.context?.logs ?? simErr?.logs ?? [];
-    console.error("[ERROR] Simulation threw:", simErr?.message ?? simErr);
-    logs.forEach((log: string, i: number) => console.log(`  [${i}] ${log}`));
-    throw simErr;
-  }
+//     console.log("✅ Simulation passed, sending...");
+//     console.log("📋 Simulation logs:");
+//     simulation.logs?.forEach((log: string, i: number) =>
+//       console.log(`  [${i}] ${log}`)
+//     );
+//   } catch (simErr: any) {
+//     // SolanaError wraps simulation errors — extract the logs
+//     const logs = simErr?.context?.logs ?? simErr?.logs ?? [];
+//     console.error("[ERROR] Simulation threw:", simErr?.message ?? simErr);
+//     logs.forEach((log: string, i: number) => console.log(`  [${i}] ${log}`));
+//     throw simErr;
+//   }
 
-  try {
-    await sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions })(
-      signedTransaction,
-      {
-        commitment: "confirmed",
-      }
-    );
-  } catch (err: any) {
-    // @solana/kit wraps the RPC error — the logs are in err.context
-    console.error("[ERROR] Send failed:", err?.message);
-    console.error("   Error code:", err?.context?.err);
+//   try {
+//     await sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions })(
+//       signedTransaction,
+//       {
+//         commitment: "confirmed",
+//       }
+//     );
+//   } catch (err: any) {
+//     // @solana/kit wraps the RPC error — the logs are in err.context
+//     console.error("[ERROR] Send failed:", err?.message);
+//     console.error("   Error code:", err?.context?.err);
 
-    const logs: string[] = err?.context?.logs ?? [];
-    if (logs.length) {
-      console.error("📋 Transaction logs:");
-      logs.forEach((log, i) => console.error(`  [${i}] ${log}`));
-    } else {
-      // Fall back to full error dump
-      console.error(
-        "   Full error:",
-        JSON.stringify(
-          err,
-          (_, v) => (typeof v === "bigint" ? v.toString() : v),
-          2
-        )
-      );
-    }
+//     const logs: string[] = err?.context?.logs ?? [];
+//     if (logs.length) {
+//       console.error("📋 Transaction logs:");
+//       logs.forEach((log, i) => console.error(`  [${i}] ${log}`));
+//     } else {
+//       // Fall back to full error dump
+//       console.error(
+//         "   Full error:",
+//         JSON.stringify(
+//           err,
+//           (_, v) => (typeof v === "bigint" ? v.toString() : v),
+//           2
+//         )
+//       );
+//     }
 
-    throw err;
-  }
+//     throw err;
+//   }
 
-  const sig = getSignatureFromTransaction(signedTransaction);
-  return sig;
-}
+//   const sig = getSignatureFromTransaction(signedTransaction);
+//   return sig;
+// }
 
 export function validateGiftCreationInputs(
   createGiftData: CreateGiftData,
@@ -254,10 +258,12 @@ import {
 } from "@solana-program/system";
 import {
   getCreateGiftInstruction,
+  Gift,
   SOLGIFT_PROGRAM_ADDRESS,
 } from "../generated/solgift";
 import { u16ToLeBytes } from "../helper/compute";
 import {
+  fetchDigitalAsset,
   findAssociatedTokenPda,
   findMasterEditionPda,
   findMetadataPda,
@@ -271,6 +277,7 @@ import {
   getMintToInstruction,
   TOKEN_PROGRAM_ADDRESS,
 } from "@solana-program/token";
+import { getAddMemoInstruction } from "@solana-program/memo";
 
 export function createPrivySigner(
   wallet: ConnectedStandardSolanaWallet
@@ -496,6 +503,9 @@ export function createAuthorizedRecipientSigner(
 }
 
 export const rpc = createSolanaRpc("https://api.devnet.solana.com");
+const rpcSubscriptions = createSolanaRpcSubscriptions(
+  "ws://api.devnet.solana.com"
+);
 
 export async function runSimulation({
   userPda,
@@ -792,3 +802,196 @@ export async function runSimulation({
     throw new Error(String(error));
   }
 }
+
+// export async function claimRentAuthorizedClaimer({
+//   nftMint,
+//   authorizedClaimerKeypair,
+//   sender,
+// }: {
+//   nftMint: Address<string>;
+//   authorizedClaimerKeypair: KeyPairSigner;
+//   sender: Address<string> | null;
+// }) {
+//   try {
+//     if (!sender) return;
+//     const { value: sol_left } = await rpc
+//       .getBalance(authorizedClaimerKeypair.address)
+//       .send();
+
+//     // Second tx: clean up SOL from authorized claimer
+//     if (sol_left - lamports(5000n) <= 0) return;
+//     const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+//     const emptyAuthorizedClaimerIx = getTransferSolInstruction({
+//       source: authorizedClaimerKeypair,
+//       destination: sender,
+//       amount: sol_left - lamports(5000n),
+//     });
+//     const instructions_2: Instruction[] = [];
+//     instructions_2.push(emptyAuthorizedClaimerIx);
+//     const transactionMessage = pipe(
+//       createTransactionMessage({ version: 0 }),
+//       (tx) => setTransactionMessageFeePayerSigner(authorizedClaimerKeypair, tx),
+//       (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+//       (tx) => appendTransactionMessageInstructions(instructions_2, tx)
+//     );
+
+//     const signedTransaction =
+//       await signTransactionMessageWithSigners(transactionMessage);
+//     assertIsTransactionWithBlockhashLifetime(signedTransaction);
+
+//     await sendAndConfirmTransactionFactory({
+//       rpc,
+//       rpcSubscriptions,
+//     })(signedTransaction, { commitment: "confirmed" });
+//     console.log("HJI2");
+
+//     const asset = await fetchDigitalAsset(rpc, nftMint);
+
+//     console.log("NFT created successfully!");
+//     console.log("Mint address:", nftMint);
+
+//     console.log("Name:", asset.metadata.name);
+//     console.log("URI:", asset.metadata.uri);
+//   } catch (error) {
+//     console.log(error);
+//     throw error;
+//   }
+// }
+
+// export async function sendAndConfirm(options: {
+//   instructions: Instruction[];
+//   signer: TransactionSigner<string>;
+//   payer: TransactionSigner<string>;
+//   setClaimGiftError?: React.Dispatch<
+//     React.SetStateAction<ClaimGiftErrors | null>
+//   >;
+// }) {
+//   const { instructions, payer, signer, setClaimGiftError } = options;
+
+//   const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+
+//   console.log(payer.address, signer.address, "BLINK");
+
+//   const transactionMessage = pipe(
+//     createTransactionMessage({ version: 0 }),
+//     (tx) => setTransactionMessageFeePayerSigner(payer, tx),
+//     (tx) =>
+//       appendTransactionMessageInstructions(
+//         [
+//           getAddMemoInstruction({
+//             memo: "adding signer",
+//             signers: [payer, signer],
+//           }),
+//         ],
+//         tx
+//       ),
+//     (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+//     (tx) => appendTransactionMessageInstructions(instructions, tx)
+//   );
+
+//   const signedTransaction =
+//     await signTransactionMessageWithSigners(transactionMessage);
+
+//   assertIsTransactionWithBlockhashLifetime(signedTransaction);
+//   assertIsFullySignedTransaction(signedTransaction);
+
+//   const transactionSigners = signedTransaction.signatures;
+
+//   console.log("✅ Signers signature status:");
+//   Object.entries(transactionSigners).forEach(([address, signature], i) => {
+//     const hasSignature = signature !== null;
+//     if (hasSignature) {
+//       console.log(`  [${i}] Signed: ${address}`);
+//     } else {
+//       console.log(`  [${i}] NOT SIGNED: ${address}`);
+//     }
+//   });
+
+//   assertIsTransactionWithBlockhashLifetime(signedTransaction);
+
+//   // ── Simulate first to get full logs before attempting send ───────────────
+//   try {
+//     const { value: simulation } = await rpc
+//       .simulateTransaction(
+//         getBase64EncodedWireTransaction(signedTransaction), // encode signed tx → base64 wire format
+//         {
+//           encoding: "base64",
+//           replaceRecentBlockhash: true, // use current blockhash for simulation
+//           commitment: "confirmed",
+//         }
+//       )
+//       .send();
+
+//     if (simulation.err) {
+//       if (setClaimGiftError)
+//         setClaimGiftError(ClaimGiftErrors.FAILED_TO_CLAIM_GIFT);
+//       console.error(
+//         "❌ Simulation error:",
+//         JSON.stringify(
+//           simulation.err,
+//           (_, v) => (typeof v === "bigint" ? v.toString() : v),
+//           2
+//         )
+//       );
+//       console.error("📋 Logs:");
+//       simulation.logs?.forEach((log, i) => console.log(`  [${i}] ${log}`));
+//       throw new Error(
+//         `Simulation failed: ${JSON.stringify(
+//           simulation.err,
+//           (_, v) => (typeof v === "bigint" ? v.toString() : v),
+//           2
+//         )}`
+//       );
+//     }
+
+//     console.log("✅ Simulation passed, sending...");
+//     console.log("📋 Simulation logs:");
+//     simulation.logs?.forEach((log, i) => console.log(`  [${i}] ${log}`));
+//   } catch (simErr: any) {
+//     // SolanaError wraps simulation errors — extract the logs
+//     if (setClaimGiftError)
+//       setClaimGiftError(ClaimGiftErrors.FAILED_TO_CLAIM_GIFT);
+//     const logs = simErr?.context?.logs ?? simErr?.logs ?? [];
+//     console.error("❌ Simulation threw:", simErr?.message ?? simErr);
+//     logs.forEach((log: string, i: number) => console.log(`  [${i}] ${log}`));
+
+//     throw simErr;
+//   }
+
+//   try {
+//     await sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions })(
+//       signedTransaction,
+//       { commitment: "confirmed" }
+//     );
+//     console.log(
+//       "WAS JUST ABOUT TO SEND THE TRANSACTION VIA sendAndConfirmTransactionFactory"
+//     );
+//   } catch (err: any) {
+//     // @solana/kit wraps the RPC error — the logs are in err.context
+//     if (setClaimGiftError)
+//       setClaimGiftError(ClaimGiftErrors.FAILED_TO_CLAIM_GIFT);
+//     console.error("❌ Send failed:", err?.message);
+//     console.error("   Error code:", err?.context?.err);
+
+//     const logs: string[] = err?.context?.logs ?? [];
+//     if (logs.length) {
+//       console.error("📋 Transaction logs:");
+//       logs.forEach((log, i) => console.error(`  [${i}] ${log}`));
+//     } else {
+//       // Fall back to full error dump
+//       console.error(
+//         "   Full error:",
+//         JSON.stringify(
+//           err,
+//           (_, v) => (typeof v === "bigint" ? v.toString() : v),
+//           2
+//         )
+//       );
+//     }
+
+//     throw err;
+//   }
+
+//   const sig = getSignatureFromTransaction(signedTransaction);
+//   return sig;
+// }

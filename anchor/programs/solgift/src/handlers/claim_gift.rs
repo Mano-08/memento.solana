@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use mpl_token_metadata::accounts::MasterEdition;
 use crate::constants::SEED_GIFT_ACCOUNT;
 use crate::error::{ClaimError, GiftError};
-use crate::state::Gift;
+use crate::state::{Gift, GiftStatus};
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token_interface;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, CloseAccount};
@@ -24,7 +24,7 @@ pub struct ClaimGift<'info> {
         mut, 
         seeds = [&SEED_GIFT_ACCOUNT, &gift.sender.key().as_ref(), &gift.index.to_le_bytes()],
         bump = gift.bump,
-        constraint = gift.claimed == false @ ClaimError::ClaimedAlready,
+        constraint = gift.status == GiftStatus::NotClaimed @ ClaimError::ClaimedAlready,
         constraint = gift.authorized_claimer == authorized_claimer.key() @ ClaimError::UnauthorizedClaimer
     )]
     pub gift: Account<'info, Gift>,
@@ -113,7 +113,7 @@ pub fn claim_gift(ctx: Context<ClaimGift>) -> Result<()> {
     **to.try_borrow_mut_lamports()? += gift.sol_amount;
 
     // Mark gift as claimed and store claim time
-    gift.claimed = true;
+    gift.status = GiftStatus::Claimed;
     gift.claimed_on = current_time;
     gift.asset_recipient = *ctx.accounts.asset_recipient.key;
     
@@ -126,14 +126,3 @@ pub fn claim_gift(ctx: Context<ClaimGift>) -> Result<()> {
 
     Ok(())
 }
-
-// ------------------------------------------------------------------------------------------------
-// What does the claim_gift function do?
-//
-// - Checks the current time to ensure that the delivery date has passed before allowing claim
-// - Verifies the provided answer matches the stored answer hash for added security/privacy
-// - Uses PDA-derived authority to transfer the escrowed NFT from the gift account to the asset_recipient's token account
-// - Closes the NFT escrowed account (PDA's ATA) and refunds rent to the recipient
-// - Transfers the associated SOL from the gift PDA to the asset_recipient
-// - Marks the gift as claimed and records the timestamp
-// - Emits a GiftClaimed event for off-chain tracking and notifications

@@ -8,3 +8,4 @@
 
 export * from "./giftClaimed";
 export * from "./giftCreated";
+export * from "./giftStatus";

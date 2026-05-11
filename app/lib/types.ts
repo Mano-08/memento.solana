@@ -70,3 +70,11 @@ export type SendGiftProps = {
   >;
   createGiftData: CreateGiftData;
 };
+
+export enum ClaimGiftErrors {
+  INVALID_GIFT_ID,
+  GIFT_DOESNT_EXIST,
+  GIFT_ALREADY_CLAIMED,
+  GIFT_LOCKED,
+  FAILED_TO_CLAIM_GIFT,
+}

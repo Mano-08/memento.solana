@@ -1,4 +1,11 @@
 use anchor_lang::prelude::*;
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum GiftStatus {
+    NotClaimed,
+    Claimed,
+    Cancelled,
+}
+
 
 #[account]
 pub struct Gift {
@@ -10,7 +17,7 @@ pub struct Gift {
     pub asset_recipient:       Pubkey,              // 32 Bytes
     pub index:                 u16,                 // 2 Bytes
     pub nft_mint:              Pubkey,              // 32 Bytes
-    pub claimed:               bool,                // 1 Byte
+    pub status:                GiftStatus,          // 1 Byte
     pub sol_amount:            u64,                 // 8 Bytes
     pub claimed_on:            i64,                 // 8 Bytes 
     pub bump:                  u8                   // 1 Byte

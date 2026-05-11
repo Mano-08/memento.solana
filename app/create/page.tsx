@@ -294,10 +294,10 @@ export default function CreateGiftForm() {
     >
       <form
         onSubmit={(e) => e.preventDefault()}
-        className="max-w-5xl mx-auto flex sm:flex-row flex-col justify-center items-start"
+        className="max-w-5xl mx-auto flex lg:flex-row flex-col justify-center items-start"
       >
         <div
-          className={`sm:max-w-[30vw] flex flex-col gap-4 rounded-[44px] p-6 w-full`}
+          className={`lg:max-w-[30vw] flex flex-col gap-4 rounded-[44px] p-6 w-full`}
         >
           <UploadImage
             giftInputError={giftInputError}
@@ -1465,7 +1465,7 @@ function LoadingStagesModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md [&>button]:hidden rounded-[24px]">
+      <DialogContent className="lg:max-w-md [&>button]:hidden rounded-[24px]">
         <DialogHeader className="flex flex-row items-center justify-between px-7 pt-7">
           <DialogTitle className="text-base text-left">
             {stageLabels.every(({ stage }) => {

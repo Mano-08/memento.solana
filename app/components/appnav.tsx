@@ -152,7 +152,7 @@ function HowToCreateGiftDialog() {
           How to create gift
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md rounded-[24px] px-0 pb-0 pt-0 overflow-hidden">
+      <DialogContent className="lg:max-w-md rounded-[24px] px-0 pb-0 pt-0 overflow-hidden">
         <div className="flex flex-col gap-2 items-center text-center">
           <DialogHeader className="w-full px-6 pt-8">
             <DialogTitle className="text-lg font-semibold">
