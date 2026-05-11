@@ -737,7 +737,7 @@ export default function Page() {
     >
       <Modal closeGiftErrorModal={closeGiftErrorModal} error={claimGiftError} />
 
-      {/* {gift && (
+      {gift && (
         <EmailOTPModal
           decrypted={decrypted}
           open={!emailVerified}
@@ -748,16 +748,7 @@ export default function Page() {
           setEmail={setEmail}
           setEmailVerified={setEmailVerified}
         />
-      )} */}
-      <input
-        type="email"
-        placeholder="Enter your email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="rounded-lg w-full px-1.5 text-left text-sm py-2 leading-none text-neutral-800 bg-white border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-lime-200 transition"
-        name="email"
-        id="email"
-      />
+      )}
 
       <LoadingClaimStagesModal
         giftClaimStages={giftClaimStages}
