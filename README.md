@@ -1,19 +1,21 @@
 # Memento
 
-### Gift moments and memories, wrapped in time capsule to deliver at the perfect time.
+### Gift moments and memories, delivered at the perfect time.
 
----
+<img width="1470" height="831" alt="image" src="https://github.com/user-attachments/assets/639a89a8-2cc1-43ef-9844-c347c25b0ea1" />
 
 Memento is a decentralized platform that lets you create time-locked gifts combining heartfelt photos, cryptocurrency, and scheduled delivery. Wrap your memories in a cryptographic time capsule that reveals itself exactly when you intend it to.
 
+Demo Link: <a href="https://youtu.be/edVbmR_xUIc?si=BS7B3dvLGgq0uIRG">Watch On YouTube</a>
+
 ## Key Features:
 
-Photo Memories – Attach photos capturing your shared moments
-Crypto Gifts – Add SOL or other funds to your gift
-Time-Locked Delivery – Set an exact reveal date
-Secure Claiming – Cryptographic security ensures only the intended recipient can claim
-Email Notifications – Automated delivery notifications when gifts are ready
-Gift Cancellation – Cancel unclaimed gifts and reclaim your funds
+- Photo Memories – Attach photos capturing your shared moments
+- Crypto Gifts – Add SOL to your gift
+- Time-Locked Delivery – Set an exact reveal date
+- Secure Claiming – Cryptographic security ensures only the intended recipient can claim
+- Email Notifications – Automated delivery notifications when gifts are ready
+- Gift Cancellation – Cancel unclaimed gifts and reclaim your funds
 
 ---
 
@@ -23,34 +25,48 @@ Gift Cancellation – Cancel unclaimed gifts and reclaim your funds
 
 #### Create Your Gift
 
-Upload a photo of your shared moments
-Add SOL funds to the gift
-Set a reveal date for delivery
+- Upload a photo of your shared moments
+- Add SOL funds to the gift
+- Set a reveal date for delivery
+
+```ts
+const createGiftIx = getCreateGiftInstruction({
+  signer: signer,
+  user: userPda,
+  gift: giftPda,
+  salt: salt,
+  nftMint: nftMint.address,
+  giftNftAta: giftNftAta,
+  solAmount: solAmount,
+  deliveryDate: birthdayTimestamp,
+  authorizedClaimer: authorizedClaimerSigner,
+});
+```
 
 #### On-Chain Tracking
 
-Each user has an on-chain account tracking their gift count
-New gifts are indexed by this count (auto-incremented)
-Gifts are uniquely identified by (user_account, gift_index)
+- Each user has an on-chain account tracking their gift count
+- New gifts are indexed by this count (auto-incremented)
+- Gifts are uniquely identified by (user_account, gift_index)
 
 #### NFT Minting & Fund Escrow
 
-An NFT is minted and stored in the Gift NFT Associated Token Account (ATA)
-Funds are held securely by the gift PDA (Program Derived Address)
+- An NFT is minted and stored in the Gift NFT Associated Token Account (ATA)
+- Funds are held securely by the gift PDA (Program Derived Address)
 
 #### Recipient Authorization Setup
 
-Enter the recipient's email address
-Generate a random salt
-Set a security question the recipient knows the answer to
-Hash email + salt + answer to create an Ed25519 private key
-Fund this derived wallet with SOL for claiming gas fees
+- Enter the recipient's email address
+- Generate a random salt
+- Set a security question the recipient knows the answer to
+- Hash email + salt + answer to create an Ed25519 private key
+- Fund this derived wallet with SOL for claiming gas fees
 
 #### Secure Storage
 
-Security question is encrypted and stored in Supabase DB
-pg_cron runs daily to check delivery dates
-Edge functions send email notifications when gifts are ready
+- Security question is encrypted and stored in Supabase DB
+- pg_cron runs daily to check delivery dates
+- Edge functions send email notifications when gifts are ready
 
 ---
 
@@ -58,23 +74,34 @@ Edge functions send email notifications when gifts are ready
 
 #### Email Verification
 
-Recipient receives email notification on the reveal date
-Prompted to verify email address via OTP
+- Recipient receives email notification on the reveal date
+- Prompted to verify email address via OTP
 
 #### Security Question
 
-Encrypted security question is decrypted and displayed
-Recipient answers the question
+- Encrypted security question is decrypted and displayed
+- Recipient answers the question
 
 #### Keypair Derivation
 
-System derives the authorized keypair using email + salt + answer
-Validates the recipient's identity cryptographically
+- System derives the authorized keypair using email + salt + answer
+- Validates the recipient's identity cryptographically
 
 #### Claim the Gift
 
-Recipient connects their wallet (Privy or any Web3 wallet)
-Receives the NFT and funds from the gift PDA
+- Recipient connects their wallet (Privy or any Web3 wallet)
+- Receives the NFT and funds from the gift PDA
+
+```ts
+const claimGiftIx = getClaimGiftInstruction({
+  authorizedClaimer: payer,
+  assetRecipient: signer,
+  gift: address(gift_pda),
+  nftMint: nftMint,
+  giftNftAta: giftNftAta,
+  assetRecipientNftAta: assetRecipientNftAta,
+});
+```
 
 ---
 
@@ -85,11 +112,21 @@ Users can cancel gifts under the following conditions:
 - Gift has not been claimed
 - Gift has not been previously cancelled
 
+```ts
+const cancelGiftIx = getCancelGiftInstruction({
+  signer: signer,
+  authorizedClaimer: authorizedClaimerSigner,
+  gift: giftPda,
+  giftNftAta: giftNftAta,
+  nftMint: nftMint,
+});
+```
+
 #### What Happens on Cancellation:
 
-All funds are returned to the gift creator
-The NFT is burned
-All associated rent from empty accounts is reclaimed
+- All funds are returned to the gift creator
+- The NFT is burned
+- All associated rent from empty accounts is reclaimed
 
 ---
 
@@ -97,11 +134,11 @@ All associated rent from empty accounts is reclaimed
 
 Memento uses a multi-layered security approach:
 
-Cryptographic Derivation: Recipient wallet is derived from hash(email + salt + answer), ensuring only someone with all three pieces can claim
-On-Chain Escrow: Funds are locked in a PDA controlled by smart contract logic
-Encrypted Storage: Security questions are encrypted at rest in Supabase
-OTP Verification: Email ownership verified before revealing security question
-Time-Locks: Gifts cannot be claimed before the reveal date
+- Cryptographic Derivation: Recipient wallet is derived from hash(email + salt + answer), ensuring only someone with all three pieces can claim
+- On-Chain Escrow: Funds are locked in a PDA controlled by smart contract logic
+- Encrypted Storage: Security questions are encrypted at rest in Supabase
+- OTP Verification: Email ownership verified before revealing security question
+- Time-Locks: Gifts cannot be claimed before the reveal date
 
 ---
 
@@ -127,7 +164,7 @@ Open [http://localhost:3000](http://localhost:3000), connect your wallet, and in
 | pg_cron                 | Scheduled task runner for daily gift delivery checks                                         |
 | Supabase Edge Functions | for serverless email delivery on reveal dates                                                |
 
-–
+
 
 ## Project Structure
 
