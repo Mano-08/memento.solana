@@ -1413,6 +1413,7 @@ type UploadImageProps = {
   giftInputError: GiftInputError | null;
   setImageFile: React.Dispatch<React.SetStateAction<File | null>>;
 };
+
 function UploadImage({
   imageFile,
   setImageFile,
@@ -1420,8 +1421,28 @@ function UploadImage({
 }: UploadImageProps) {
   return (
     <>
+      <input
+        id="image-upload"
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files && e.target.files[0]) {
+            if (e.target.files[0].size > 5 * 1024 * 1024) {
+              toast.error("Cannot upload image: File is larger than 5MB.");
+              e.target.value = ""; // reset input
+              return;
+            }
+            setImageFile(e.target.files[0]);
+          }
+        }}
+      />
       {imageFile ? (
-        <div className="w-full h-full flex justify-center items-center">
+        <div
+          className="w-full h-full flex justify-center items-center cursor-pointer"
+          onClick={() => document.getElementById("image-upload")?.click()}
+          title="Click to upload a new image"
+        >
           <img
             src={URL.createObjectURL(imageFile)}
             alt="Preview"
@@ -1444,24 +1465,6 @@ function UploadImage({
             }
           }}
         >
-          <input
-            id="image-upload"
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files && e.target.files[0]) {
-                if (e.target.files[0].size > 5 * 1024 * 1024) {
-                  toast.error("Cannot upload image: File is larger than 5MB.");
-
-                  e.target.value = ""; // reset input
-                  return;
-                }
-
-                setImageFile(e.target.files[0]);
-              }
-            }}
-          />
           <div className="absolute bottom-6 right-6">
             <span className="block transition-transform duration-200 ease-in-out group-hover:scale-105">
               <ImageUpIcon className="h-8 w-8 text-white drop-shadow-lg" />
