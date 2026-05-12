@@ -125,7 +125,7 @@ export default function Home() {
                 Wrap <span className="text-black/50">the Gift</span>
               </h3>
               <ol className="py-2">
-                <li>Pick a photo and let AI enhance it</li>
+                <li>Pick a photo</li>
                 <li>Turn it into an NFT with a security question</li>
                 <li>Set a reveal date and wrap your gift!</li>
               </ol>

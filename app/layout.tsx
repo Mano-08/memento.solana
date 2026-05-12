@@ -31,7 +31,7 @@ export default function RootLayout({
       lang="en"
       className={`${cn("font-sans", geist.variable)} overflow-x-hidden max-w-screen`}
     >
-      <body className={`${inter.className} antialiased relative w-screen`}>
+      <body className={`${inter.className} relative antialiased w-screen`}>
         <Providers>
           <AppNav />
           {children}

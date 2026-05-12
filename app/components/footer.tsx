@@ -11,7 +11,7 @@ export default function Navbar() {
           </Link>
           . All rights reserved.
         </div>
-        <Link href="/privacy">Privacy Policy</Link>
+        <Link href="/privacy"></Link>
       </div>
     </footer>
   );

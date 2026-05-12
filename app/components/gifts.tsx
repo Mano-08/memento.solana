@@ -86,7 +86,10 @@ import {
   createAuthorizedRecipientSigner,
   createPrivySigner,
 } from "../lib/utils";
-import { useWalletAccountTransactionSendingSigner } from "@solana/react";
+import {
+  useWalletAccountTransactionSendingSigner,
+  useWalletAccountTransactionSigner,
+} from "@solana/react";
 import { ClaimGiftErrors } from "../lib/types";
 import { getAddMemoInstruction } from "@solana-program/memo";
 
@@ -159,7 +162,7 @@ function SupportExternalWallet({
   uiWalletAccount: UiWalletAccount;
   userWallet: Address | null;
 }) {
-  const signer = useWalletAccountTransactionSendingSigner(
+  const signer = useWalletAccountTransactionSigner(
     uiWalletAccount,
     "solana:devnet"
   );
