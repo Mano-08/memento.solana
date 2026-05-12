@@ -87,6 +87,9 @@ const createGiftIx = getCreateGiftInstruction({
 - System derives the authorized keypair using email + salt + answer
 - Validates the recipient's identity cryptographically
 
+<img width="1056" height="527" alt="image" src="https://github.com/user-attachments/assets/31f69dba-cda2-4ddf-8662-07b90260c5d9" />
+
+
 #### Claim the Gift
 
 - Recipient connects their wallet (Privy or any Web3 wallet)
