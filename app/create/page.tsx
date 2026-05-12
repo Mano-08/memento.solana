@@ -1181,7 +1181,14 @@ function SendGift({
           try {
             response = await fetch(`/api/v1/users/${signer.address}/gifts`, {
               method: "POST",
-              body: JSON.stringify(insertData),
+              body: JSON.stringify({
+                insertData,
+                emailRemainderData: {
+                  email: email,
+                  gift_pda: giftPda,
+                  reminder_date: createGiftData.birthday, // (yyyy-mm-dd)
+                },
+              }),
               headers: {
                 "Content-Type": "application/json",
               },

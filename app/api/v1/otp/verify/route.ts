@@ -18,7 +18,6 @@ export async function POST(request: NextRequest) {
     }
 
     if (typeof code !== "string" || !/^\d{4}$/.test(code)) {
-      console.log("Dji", typeof code, code);
       return NextResponse.json(
         { error: "OTP must be a 4-digit number." },
         { status: 400 }

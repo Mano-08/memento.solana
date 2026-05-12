@@ -455,49 +455,6 @@ export function createAuthorizedRecipientSigner(
         `[Authorized-Recipient] signer invoked for ${transactions.length} transaction(s)`
       );
       return signer.signTransactions(transactions);
-
-      try {
-        const results = await Promise.all(
-          transactions.map(async (tx, index) => {
-            try {
-              console.log(
-                `[Authorized-Recipient] Signing transaction ${index + 1} with keypair...`
-              );
-
-              // KeyPairSigner has a signTransactions method that takes TransactionMessage
-              // We need to sign the raw transaction
-              const [signedTx] = await signer.signTransactions([tx]);
-
-              const signature = signedTx[signer.address];
-
-              // Decode to extract the signature
-              console.log(
-                `[Authorized-Recipient] ✅ Transaction ${index + 1} signed:`,
-                signature
-              );
-
-              return {
-                signature,
-                publicKey: signer.address,
-              };
-            } catch (error) {
-              console.error(
-                `[Authorized-Recipient] ❌ Error signing transaction ${index + 1}:`,
-                error
-              );
-              throw error;
-            }
-          })
-        );
-
-        return results;
-      } catch (error) {
-        console.error(
-          "[Authorized-Recipient] ❌ Error in signTransactions:",
-          error
-        );
-        throw error;
-      }
     },
   };
 }
@@ -843,15 +800,14 @@ export async function claimRentAuthorizedClaimer({
       rpc,
       rpcSubscriptions,
     })(signedTransaction, { commitment: "confirmed" });
-    console.log("HJI2");
 
     const asset = await fetchDigitalAsset(rpc, nftMint);
 
-    console.log("NFT created successfully!");
-    console.log("Mint address:", nftMint);
+    // console.log("NFT created successfully!");
+    // console.log("Mint address:", nftMint);
 
-    console.log("Name:", asset.metadata.name);
-    console.log("URI:", asset.metadata.uri);
+    // console.log("Name:", asset.metadata.name);
+    // console.log("URI:", asset.metadata.uri);
   } catch (error) {
     console.log(error);
     throw error;
@@ -869,8 +825,6 @@ export async function sendAndConfirm(options: {
   const { instructions, payer, signer, setClaimGiftError } = options;
 
   const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
-
-  console.log(payer.address, signer.address, "BLINK");
 
   const transactionMessage = pipe(
     createTransactionMessage({ version: 0 }),
@@ -962,9 +916,6 @@ export async function sendAndConfirm(options: {
     await sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions })(
       signedTransaction,
       { commitment: "confirmed" }
-    );
-    console.log(
-      "WAS JUST ABOUT TO SEND THE TRANSACTION VIA sendAndConfirmTransactionFactory"
     );
   } catch (err: any) {
     // @solana/kit wraps the RPC error — the logs are in err.context

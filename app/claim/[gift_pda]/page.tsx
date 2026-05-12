@@ -9,7 +9,15 @@ import {
   GiftStatus,
 } from "@/app/generated/solgift";
 import { UiWalletAccount, useWallets } from "@wallet-standard/react";
-import { ArrowRight, Check, DollarSign, Key, Mail, Puzzle } from "lucide-react";
+import {
+  ArrowRight,
+  Calendar,
+  Check,
+  DollarSign,
+  Key,
+  Mail,
+  Puzzle,
+} from "lucide-react";
 import { getAddMemoInstruction } from "@solana-program/memo";
 import { decryptQuestion, recursiveSha256 } from "@/app/helper/compute";
 
@@ -708,7 +716,7 @@ export default function Page() {
 
   const handleReceivedModalOpenChange = useCallback(
     (open: boolean) => {
-      return;
+      // return;
       if (!open) {
         // Only allow closing if any stage has status Error or all claim stages succeeded
         const canClose =
@@ -1361,8 +1369,8 @@ function LoadingClaimStagesModal({
                 </div>
                 <div className="flex flex-row items-center justify-between w-full text-black/90">
                   <div className="flex items-center">
-                    <span className="inline-block w-5 h-5 mr-2" />
-                    <span>createdOn On</span>
+                    <Calendar className="w-5 h-5 mr-2" />
+                    <span>Gift Amount</span>
                   </div>
                   <span className="font-medium">
                     {giftClaimed.gift.data.createdOn

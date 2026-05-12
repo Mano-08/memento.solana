@@ -7,7 +7,7 @@ import { createClient } from "@/app/lib/supabase/client";
 
 export async function POST(req: NextRequest) {
   try {
-    const insertData = await req.json();
+    const { insertData, emailRemainderData } = await req.json();
     const supabase = await createSupabaseSSRClient();
 
     // Try to get the user from the request (using the supabase server client for SSR)
@@ -52,6 +52,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const safeInsertData2 = {
+      ...emailRemainderData,
+      is_sent: false,
+      sender,
+    };
+
+    const res = await supabase
+      .from("email_reminders")
+      .insert([safeInsertData2]);
+
+    // If insert fails due to RLS, return 403 with a clear error message
+    if (res.error) {
+      // Supabase Postgres RLS error code is '42501'
+      if (res.error.code === "42501") {
+        return Response.json(
+          {
+            error: "Row level security policy prevented insert",
+            details: res.error.message || null,
+          },
+          { status: 403 }
+        );
+      }
+      // Other DB error
+      return Response.json(
+        { error: "Supabase insert failed", details: res.error.message },
+        { status: 500 }
+      );
+    }
     return Response.json(
       { message: "Row inserted successfully" },
       { status: 200 }
