@@ -44,6 +44,7 @@ export default function AppNav() {
   let isCreate = pathname === "/create" || pathname.startsWith("/create");
   let isClaim = pathname.startsWith("/claim");
   let isRoot = pathname === "/";
+  let isTerms = pathname === "/terms";
 
   // Set icon, text, and container class
   let BrandIcon, brandLabel;
@@ -86,7 +87,7 @@ export default function AppNav() {
   }, []);
 
   return (
-    <header className={`w-full sticky z-50 top-0 h-14`}>
+    <header className={`w-full sticky z-50 top-0 h-14 ${isTerms && "hidden"}`}>
       <div
         className={`${isClaim ? "justify-end" : "justify-between"} relative animate-slideDown flex flex-row items-center px-5  mx-auto text-black h-14 w-full -mt-14 transition-colors duration-300 ${
           scrolled ? "backdrop-blur-sm" : ""
@@ -119,7 +120,7 @@ export default function AppNav() {
           <div className="flex flex-row items-center">
             {isCreate && (account || user) && <HowToCreateGiftDialog />}
 
-            {userConnected && (
+            {(account || user) && (
               <Link href="/dashboard">
                 <Button
                   className="flex items-center text-sm gap-2 bg-transparent shadow-none hover:bg-neutral-100/10 text-white/50 px-3 h-8 rounded-lg font-semibold border-none hover:text-white/60"
