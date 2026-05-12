@@ -339,7 +339,7 @@ export default function CreateGiftForm() {
 
             <div>
               <input
-                className="rounded-md shrink-0 grow text-right border-none py-2.5 leading-none text-neutral-300 outline-none"
+                className="rounded-md shrink-0 max-w-[80px] grow text-right border-none py-2.5 leading-none text-neutral-300 outline-none"
                 id="giftAmount"
                 min={0}
                 step="any"
