@@ -141,11 +141,8 @@ export async function signIntoSupabaseWithPrivy({
     const {
       data: { session },
     } = await supabase.auth.getSession();
-    console.log("HERE WE ARE CALLING SIGN INTO SUPABASE WHY ? WHY PIG");
-    console.log(session);
     if (!user) {
       signOutofSupabase({ supabase });
-      console.log("SOB");
       return;
     }
     if (session) {
@@ -153,7 +150,6 @@ export async function signIntoSupabaseWithPrivy({
         ?.address as string | undefined;
       if (supabase_address !== null && wallet.address !== supabase_address) {
         signOutofSupabase({ supabase });
-        console.log("SOB");
       }
 
       return;

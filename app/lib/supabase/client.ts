@@ -29,7 +29,6 @@ async function hi() {
 
   if (accessToken) {
     const claims = decode(accessToken);
-    console.log("CLAIMS", claims);
   }
 }
 

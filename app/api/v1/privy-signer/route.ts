@@ -68,7 +68,6 @@ function getProviderConfig(): ProviderConfig {
     process.env.PRIVY_APP_SECRET &&
     process.env.PRIVY_WALLET_ID
   ) {
-    console.log("AEVERNJRKENJ");
     return {
       type: "privy",
       appId: process.env.PRIVY_APP_ID,
