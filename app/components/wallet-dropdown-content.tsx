@@ -153,7 +153,6 @@ export function WalletDropdownContent({
   async function handleDisconnect(disconnect: () => Promise<void>) {
     const supabase = createClient();
     await signOutofSupabase({ supabase });
-    console.log("SOB");
     if (walletName === "Privy") {
       logout();
     } else {
