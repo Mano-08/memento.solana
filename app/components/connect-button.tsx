@@ -148,7 +148,7 @@ export function ConnectButton({
                       const { error } = await supabase.auth.signInWithWeb3({
                         chain: "solana",
                         statement:
-                          "I accept the Terms of Service at https://example.com/tos",
+                          "I accept the terms and conditions at memento.vercel.app/terms",
                         wallet: {
                           publicKey: {
                             toBase58: () => account,
@@ -178,7 +178,7 @@ export function ConnectButton({
 
                       if (error) {
                         await new Promise((resolve) =>
-                          setTimeout(resolve, 1000)
+                          setTimeout(resolve, 3000)
                         );
                       }
                     } catch (error) {
@@ -187,7 +187,7 @@ export function ConnectButton({
                         break;
                       }
 
-                      await new Promise((resolve) => setTimeout(resolve, 1000));
+                      await new Promise((resolve) => setTimeout(resolve, 3000));
                     }
                   }
                   setLoginPrompted(true);
@@ -258,7 +258,7 @@ export function ConnectButton({
                   } = await supabase.auth.getSession();
                   if (newSession) break;
                 } catch (e) {
-                  await new Promise((resolve) => setTimeout(resolve, 1000));
+                  await new Promise((resolve) => setTimeout(resolve, 3000));
                 }
               }
               setLoginPrompted(true);

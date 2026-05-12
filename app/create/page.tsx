@@ -147,7 +147,7 @@ export default function CreateGiftForm() {
     name: "Happy 21 Sophie!",
     giftAmount: 0.001,
     birthday: formattedDate,
-    email: "421215@student.nitandhra.ac.in",
+    email: "wmano038@gmail.com",
     securityQuestion: "our favorite band name?",
     securityAnswer: "linkinpark",
   });
@@ -493,7 +493,7 @@ export default function CreateGiftForm() {
               className={`rounded-full shrink-0 text-right grow border-none py-2.5 text-sm px-3 leading-none text-neutral-300 outline-none`}
               id="email"
               type="text"
-              value={"wmano038@gmail.com"}
+              value={"lucy@gmail.com"}
               onChange={(e) => {}}
               placeholder="mark@gmail.com"
               name="email"
