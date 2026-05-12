@@ -1,36 +1,170 @@
-# solgift
+# Memento
 
-Next.js starter with Tailwind CSS, `@solana/react-hooks`, and an Anchor vault program example.
+### Gift moments and memories, delivered at the perfect time.
+
+<img width="1470" height="831" alt="image" src="https://github.com/user-attachments/assets/639a89a8-2cc1-43ef-9844-c347c25b0ea1" />
+
+Memento is a decentralized platform that lets you create time-locked gifts combining heartfelt photos, cryptocurrency, and scheduled delivery. Wrap your memories in a cryptographic time capsule that reveals itself exactly when you intend it to.
+
+Demo Link: <a href="https://youtu.be/edVbmR_xUIc?si=BS7B3dvLGgq0uIRG">Watch On YouTube</a>
+
+## Key Features:
+
+- Photo Memories – Attach photos capturing your shared moments
+- Crypto Gifts – Add SOL to your gift
+- Time-Locked Delivery – Set an exact reveal date
+- Secure Claiming – Cryptographic security ensures only the intended recipient can claim
+- Email Notifications – Automated delivery notifications when gifts are ready
+- Gift Cancellation – Cancel unclaimed gifts and reclaim your funds
+
+---
+
+## How It Works
+
+### Part 1: Gift Creation
+
+#### Create Your Gift
+
+- Upload a photo of your shared moments
+- Add SOL funds to the gift
+- Set a reveal date for delivery
+
+```ts
+const createGiftIx = getCreateGiftInstruction({
+  signer: signer,
+  user: userPda,
+  gift: giftPda,
+  salt: salt,
+  nftMint: nftMint.address,
+  giftNftAta: giftNftAta,
+  solAmount: solAmount,
+  deliveryDate: birthdayTimestamp,
+  authorizedClaimer: authorizedClaimerSigner,
+});
+```
+
+#### On-Chain Tracking
+
+- Each user has an on-chain account tracking their gift count
+- New gifts are indexed by this count (auto-incremented)
+- Gifts are uniquely identified by (user_account, gift_index)
+
+#### NFT Minting & Fund Escrow
+
+- An NFT is minted and stored in the Gift NFT Associated Token Account (ATA)
+- Funds are held securely by the gift PDA (Program Derived Address)
+
+#### Recipient Authorization Setup
+
+- Enter the recipient's email address
+- Generate a random salt
+- Set a security question the recipient knows the answer to
+- Hash email + salt + answer to create an Ed25519 private key
+- Fund this derived wallet with SOL for claiming gas fees
+
+#### Secure Storage
+
+- Security question is encrypted and stored in Supabase DB
+- pg_cron runs daily to check delivery dates
+- Edge functions send email notifications when gifts are ready
+
+---
+
+### Gift Claiming
+
+#### Email Verification
+
+- Recipient receives email notification on the reveal date
+- Prompted to verify email address via OTP
+
+#### Security Question
+
+- Encrypted security question is decrypted and displayed
+- Recipient answers the question
+
+#### Keypair Derivation
+
+- System derives the authorized keypair using email + salt + answer
+- Validates the recipient's identity cryptographically
+
+#### Claim the Gift
+
+- Recipient connects their wallet (Privy or any Web3 wallet)
+- Receives the NFT and funds from the gift PDA
+
+```ts
+const claimGiftIx = getClaimGiftInstruction({
+  authorizedClaimer: payer,
+  assetRecipient: signer,
+  gift: address(gift_pda),
+  nftMint: nftMint,
+  giftNftAta: giftNftAta,
+  assetRecipientNftAta: assetRecipientNftAta,
+});
+```
+
+---
+
+### Gift Cancellation
+
+Users can cancel gifts under the following conditions:
+
+- Gift has not been claimed
+- Gift has not been previously cancelled
+
+```ts
+const cancelGiftIx = getCancelGiftInstruction({
+  signer: signer,
+  authorizedClaimer: authorizedClaimerSigner,
+  gift: giftPda,
+  giftNftAta: giftNftAta,
+  nftMint: nftMint,
+});
+```
+
+#### What Happens on Cancellation:
+
+- All funds are returned to the gift creator
+- The NFT is burned
+- All associated rent from empty accounts is reclaimed
+
+---
+
+## Security Model
+
+Memento uses a multi-layered security approach:
+
+- Cryptographic Derivation: Recipient wallet is derived from hash(email + salt + answer), ensuring only someone with all three pieces can claim
+- On-Chain Escrow: Funds are locked in a PDA controlled by smart contract logic
+- Encrypted Storage: Security questions are encrypted at rest in Supabase
+- OTP Verification: Email ownership verified before revealing security question
+- Time-Locks: Gifts cannot be claimed before the reveal date
+
+---
 
 ## Getting Started
 
 ```shell
-npx -y create-solana-dapp@latest -t solana-foundation/templates/kit/solgift
-```
-
-```shell
-npm install   # Builds program and generates client automatically
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000), connect your wallet, and interact with the vault on devnet.
 
-## What's Included
-
-- **Wallet connection** via `@solana/react-hooks` with auto-discovery
-- **SOL Vault program** - deposit and withdraw SOL from a personal PDA vault
-- **Codama-generated client** - type-safe program interactions using `@solana/kit`
-- **Tailwind CSS v4** with light/dark mode
-
 ## Stack
 
-| Layer          | Technology                              |
-| -------------- | --------------------------------------- |
-| Frontend       | Next.js 16, React 19, TypeScript        |
-| Styling        | Tailwind CSS v4                         |
-| Solana Client  | `@solana/client`, `@solana/react-hooks` |
-| Program Client | Codama-generated, `@solana/kit`         |
-| Program        | Anchor (Rust)                           |
+| Layer                   | Technology                                                                                   |
+| ----------------------- | -------------------------------------------------------------------------------------------- |
+| Frontend                | Next.js 16, React 19, TypeScript Privy (or any Web3 wallet) – Wallet connection for claiming |
+| Styling                 | Tailwind CSS v4                                                                              |
+| Solana Client           | `@solana/client`, `@solana/react-hooks`                                                      |
+| Program Client          | Codama-generated, `@solana/kit`                                                              |
+| Program                 | Anchor (Rust)                                                                                |
+| Supabase                | Database for encrypted security questions,                                                   |
+| pg_cron                 | Scheduled task runner for daily gift delivery checks                                         |
+| Supabase Edge Functions | for serverless email delivery on reveal dates                                                |
+
+
 
 ## Project Structure
 
@@ -45,117 +179,3 @@ Open [http://localhost:3000](http://localhost:3000), connect your wallet, and in
 │   └── programs/vault/        # Vault program (Rust)
 └── codama.json                # Codama client generation config
 ```
-
-## Deploy Your Own Vault
-
-The included vault program is already deployed to devnet. To deploy your own:
-
-### Prerequisites
-
-- [Rust](https://rustup.rs/)
-- [Solana CLI](https://solana.com/docs/intro/installation)
-- [Anchor](https://www.anchor-lang.com/docs/installation)
-
-### Steps
-
-1. **Configure Solana CLI for devnet**
-
-   ```bash
-   solana config set --url devnet
-   ```
-
-2. **Create a wallet (if needed) and fund it**
-
-   ```bash
-   solana-keygen new
-   solana airdrop 2
-   ```
-
-3. **Build and deploy the program**
-
-   ```bash
-   cd anchor
-   anchor build
-   anchor keys sync    # Updates program ID in source
-   anchor build        # Rebuild with new ID
-   anchor deploy
-   cd ..
-   ```
-
-4. **Regenerate the client and restart**
-   ```bash
-   npm run setup   # Rebuilds program and regenerates client
-   npm run dev
-   ```
-
-## Testing
-
-Tests use [LiteSVM](https://github.com/LiteSVM/litesvm), a fast lightweight Solana VM for testing.
-
-```bash
-npm run anchor-build   # Build the program first
-npm run anchor-test    # Run tests
-```
-
-The tests are in `anchor/programs/vault/src/tests.rs` and automatically use the program ID from `declare_id!`.
-
-## Regenerating the Client
-
-If you modify the program, regenerate the TypeScript client:
-
-```bash
-npm run setup   # Or: npm run anchor-build && npm run codama:js
-```
-
-This uses [Codama](https://github.com/codama-idl/codama) to generate a type-safe client from the Anchor IDL.
-
-## Learn More
-
-- [Solana Docs](https://solana.com/docs) - core concepts and guides
-- [Anchor Docs](https://www.anchor-lang.com/docs) - program development framework
-- [Deploying Programs](https://solana.com/docs/programs/deploying) - deployment guide
-- [framework-kit](https://github.com/solana-foundation/framework-kit) - the React hooks used here
-- [Codama](https://github.com/codama-idl/codama) - client generation from IDL
-
-solana-test-validator --bpf-program metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s anchor/mpl_token_metadata.so --reset
-
-DEADLINES:
-
-[DONE] create user if not exist once login into supabase
-[DONE] store user information
-[] update frontend for demo
-
-- [] /
-- [] /create
-- [] /claim
-- [DONE] /dashboard
-
-per user we have gift count: so all the gifts upto that index is claimed or not_claimed or cancelled.
-db stores gift_id and encrypted question
-gift_created_DB -> [gift_pda] [gift_index] [encrypted_question] [gift_sender]
-gift_claimed_DB -> [claimer_wallet] [gift_pda]
-
-TODO;
-
-[DONE] create gift should not throw simuation failed error -> work on chain
-[DONE] claim gift -> no rent or orphan account should be present
-[DONE] 6. preview gift
-[DONE] 1. send claimed recipeitne + gift pda to DB
-[DONE] 5.a. dont close gift pda, instead add gift claimed_on details
-[DONE] 8. Accept gift on same day as valid ; ex created at 530 pm, then delivery date is also 530+1 pm given its the same day
-[DONE] 9. fix Wallet connector UI issue
-[DONE] 4. ceaate delivery date + creted on date in DB
-[DONE] 5. received gift should populate with info
-[DONE] 10. build dashboard
-[DONE] 3.⁠ ⁠Cron job
-[DONE] 4.⁠ ⁠Claim gift (1st thing is connecr wallet)
-[DONE] 6.⁠ ⁠Dashboard
-[DONE] 1.⁠ ⁠Connect wallet at /create
-[DONE] 2.⁠ ⁠Popup while gift creation
-
-/ - landing page (add shiny effect [P4_DONE])
-/create - toast errors [P4_DONE] + run simulation before pushing the image to Pinata [P1_DONE]
-/claim - OTP for end user [P1_DONE] + loading stage while gift information is fetched [P3] + display a blurred photo + delivery date when the gift can be claimed [P1]
-/dashboard - update profile picture + name [P4]
-appnav - sign into supabase mandatory [P1_DONE]
-cancel_gift.rs - complete the code so people can cancel gift [P1]
