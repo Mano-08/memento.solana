@@ -144,10 +144,10 @@ export default function CreateGiftForm() {
   }, [uiWallets, account])();
 
   const [createGiftData, setCreateGiftData] = useState<CreateGiftData>({
-    name: "Happy 21 Laura!",
+    name: "Happy 21 Sophie!",
     giftAmount: 0.001,
     birthday: formattedDate,
-    email: "laura@gmail.com",
+    email: "421215@student.nitandhra.ac.in",
     securityQuestion: "our favorite band name?",
     securityAnswer: "linkinpark",
   });
@@ -462,6 +462,39 @@ export default function CreateGiftForm() {
               type="text"
               value={createGiftData.email}
               onChange={handleSetRecipientEmail}
+              placeholder="mark@gmail.com"
+              name="email"
+            />
+          </fieldset>
+
+          <fieldset
+            className={`${giftInputError === GiftInputError.recipient_email && "shaky"} flex w-full font-semibold text-sm flex-row justify-between items-center bg-white/5 py-1 pl-3 pr-1 rounded-lg`}
+          >
+            <label
+              className="flex flex-row items-center gap-2 text-neutral-400 leading-none"
+              htmlFor="email"
+            >
+              <Mail size={16} /> My Email
+              <HoverCard>
+                <HoverCardTrigger asChild>
+                  <span
+                    className="w-4 h-4 flex items-center justify-center rounded-full cursor-pointer transition-colors text-neutral-5500 hover:text-neutral-200"
+                    tabIndex={0}
+                  >
+                    <CircleQuestionMark size={14} />
+                  </span>
+                </HoverCardTrigger>
+                <HoverCardContent className="text-xs py-2 px-3 rounded-xl bg-white/95 text-black shadow">
+                  We'll let your friend that the gift was sent by you!
+                </HoverCardContent>
+              </HoverCard>
+            </label>
+            <input
+              className={`rounded-full shrink-0 text-right grow border-none py-2.5 text-sm px-3 leading-none text-neutral-300 outline-none`}
+              id="email"
+              type="text"
+              value={"wmano038@gmail.com"}
+              onChange={(e) => {}}
               placeholder="mark@gmail.com"
               name="email"
             />
