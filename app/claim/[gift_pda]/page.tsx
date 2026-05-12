@@ -716,7 +716,7 @@ export default function Page() {
 
   const handleReceivedModalOpenChange = useCallback(
     (open: boolean) => {
-      // return;
+      return;
       if (!open) {
         // Only allow closing if any stage has status Error or all claim stages succeeded
         const canClose =
