@@ -44,7 +44,7 @@ import {
 } from "@solana/kit";
 const rpc = createSolanaRpc("https://api.devnet.solana.com");
 const rpcSubscriptions = createSolanaRpcSubscriptions(
-  "ws://api.devnet.solana.com"
+  "wss://api.devnet.solana.com"
 );
 
 import {

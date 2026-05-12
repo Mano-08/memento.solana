@@ -148,7 +148,7 @@ export function ConnectButton({
                       const { error } = await supabase.auth.signInWithWeb3({
                         chain: "solana",
                         statement:
-                          "I accept the terms and conditions at memento.vercel.app/terms",
+                          "I accept the terms and conditions at memento-solana.vercel.app/terms",
                         wallet: {
                           publicKey: {
                             toBase58: () => account,
