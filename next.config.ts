@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
     "@solana/keychain-turnkey",
     "@solana/keychain-vault",
     "@solana/keychain-aws-kms",
+    "pino",
+    "pino-pretty",
+    "thread-stream",
   ],
 };
 

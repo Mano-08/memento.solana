@@ -933,7 +933,7 @@ function CopyGiftURL({ gift }: { gift: GiftAndNFTData }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    alert(":");
+    // alert(":");
     let baseUrl = "";
     if (typeof window !== "undefined") {
       baseUrl = window.location.origin;
