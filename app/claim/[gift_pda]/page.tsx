@@ -120,7 +120,7 @@ import { ClaimGiftErrors } from "@/app/lib/types";
 
 const rpc = createSolanaRpc("https://api.devnet.solana.com");
 const rpcSubscriptions = createSolanaRpcSubscriptions(
-  "ws://api.devnet.solana.com"
+  "wss://api.devnet.solana.com"
 );
 
 type GiftClaimedResponse = {
@@ -801,6 +801,7 @@ export default function Page() {
           {wallet ? (
             <ClaimGiftWithEmbeddedWallet
               wallet={wallet}
+              answer={answer}
               isClaimingGift={isClaimingGift}
               handleClaimGift={handleClaimGift}
               incorrectEmail={incorrectEmail}
@@ -808,6 +809,7 @@ export default function Page() {
           ) : uiWalletAccount ? (
             <ClaimGiftWithExternalWallet
               isClaimingGift={isClaimingGift}
+              answer={answer}
               uiWalletAccount={uiWalletAccount}
               handleClaimGift={handleClaimGift}
               incorrectEmail={incorrectEmail}
@@ -906,12 +908,14 @@ type ClaimGiftWithExternalWalletProps = {
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>,
     signer: TransactionSigner<string>
   ) => void;
+  answer: string;
   incorrectEmail: boolean;
   isClaimingGift: boolean;
 };
 
 function ClaimGiftWithExternalWallet({
   uiWalletAccount,
+  answer,
   incorrectEmail,
   isClaimingGift,
   handleClaimGift,
@@ -924,6 +928,7 @@ function ClaimGiftWithExternalWallet({
   return (
     <ClaimGiftButton
       signer={signer}
+      answer={answer}
       isClaimingGift={isClaimingGift}
       handleClaimGift={handleClaimGift}
       incorrectEmail={incorrectEmail}
@@ -937,6 +942,7 @@ type ClaimGiftWithEmbeddedWalletProps = {
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>,
     signer: TransactionSigner<string>
   ) => void;
+  answer: string;
   incorrectEmail: boolean;
   isClaimingGift: boolean;
 };
@@ -945,12 +951,14 @@ function ClaimGiftWithEmbeddedWallet({
   wallet,
   handleClaimGift,
   isClaimingGift,
+  answer,
   incorrectEmail,
 }: ClaimGiftWithEmbeddedWalletProps) {
   const signer = createPrivySigner(wallet);
   return (
     <ClaimGiftButton
       signer={signer}
+      answer={answer}
       isClaimingGift={isClaimingGift}
       handleClaimGift={handleClaimGift}
       incorrectEmail={incorrectEmail}
@@ -964,6 +972,7 @@ type ClaimGiftButtonProps = {
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>,
     signer: TransactionSigner<string>
   ) => void;
+  answer: string;
   incorrectEmail: boolean;
   isClaimingGift: boolean;
 };
@@ -972,13 +981,14 @@ function ClaimGiftButton({
   signer,
   handleClaimGift,
   isClaimingGift,
+  answer,
   incorrectEmail,
 }: ClaimGiftButtonProps) {
   return (
     <Button
       type="submit"
       onClick={(e) => handleClaimGift(e, signer)}
-      disabled={incorrectEmail || isClaimingGift}
+      disabled={incorrectEmail || isClaimingGift || answer.trim() === ""}
       variant={"default"}
       className="font-semibold cursor-pointer text-black  my-2 px-3 py-2 text-sm rounded-lg w-full bg-lime-400 hover:bg-lime-400/90"
     >
